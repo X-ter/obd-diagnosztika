@@ -98,6 +98,8 @@ jobs:
           sudo udevadm trigger --name-match=kvm
       - name: Füstteszt Android emulátoron (szimulációs mód)
         uses: reactivecircus/android-emulator-runner@v2
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           api-level: 30
           target: google_apis

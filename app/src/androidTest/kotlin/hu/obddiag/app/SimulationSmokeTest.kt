@@ -47,14 +47,25 @@ class SimulationSmokeTest {
         File(dir, "$name.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
 
+    private fun present(text: String) = rule.onAllNodesWithText(text, substring = true).fetchSemanticsNodes().isNotEmpty()
+
+    /** Vár, amíg a szöveg megjelenik; ha nincs a képernyőn, a görgethető listákat a szöveghez görgeti. */
     private fun waitText(text: String, timeout: Long = 15_000) {
-        rule.waitUntil(timeout) { rule.onAllNodesWithText(text, substring = true).fetchSemanticsNodes().isNotEmpty() }
+        val end = System.currentTimeMillis() + timeout
+        while (System.currentTimeMillis() < end) {
+            rule.waitForIdle()
+            if (present(text)) return
+            val n = rule.onAllNodes(hasScrollAction()).fetchSemanticsNodes().size
+            for (i in 0 until n) {
+                runCatching { rule.onAllNodes(hasScrollAction())[i].performScrollToNode(hasText(text, substring = true)) }
+                if (present(text)) return
+            }
+            Thread.sleep(300)
+        }
+        throw AssertionError("A szöveg nem jelent meg $timeout ms alatt: \"$text\"")
     }
 
     private fun clickText(text: String, last: Boolean = false) {
-        if (rule.onAllNodesWithText(text).fetchSemanticsNodes().isEmpty()) {
-            runCatching { rule.onAllNodes(hasScrollAction()).onFirst().performScrollToNode(hasText(text)) }
-        }
         waitText(text)
         val nodes = rule.onAllNodesWithText(text, substring = false)
         (if (last) nodes.onLast() else nodes.onFirst()).performClick()
@@ -62,6 +73,15 @@ class SimulationSmokeTest {
 
     @Test
     fun fullSimulatedSession() {
+        try {
+            session()
+        } catch (t: Throwable) {
+            runCatching { shot("99_failure") }
+            throw t
+        }
+    }
+
+    private fun session() {
         shot("01_home_disconnected")
         container.connect(AdapterTarget.Simulation)
         rule.waitUntil(20_000) { container.connection.state.value is ConnectionState.Connected }

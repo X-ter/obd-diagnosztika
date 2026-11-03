@@ -18,6 +18,12 @@ for f in $(adb shell run-as $PKG ls files/screens 2>/dev/null | tr -d '\r'); do
   adb exec-out run-as $PKG cat "files/screens/$f" > "$OUT/screens/$f"
 done
 ls -la "$OUT/screens"
+# A képernyőképek közzététele egy külön kiadásban (egyszerű letölthetőség)
+if [ -n "${GH_TOKEN:-}" ]; then
+  (cd "$OUT" && zip -qr ../ui-screens.zip .)
+  gh release delete ui-screens --yes --cleanup-tag >/dev/null 2>&1 || true
+  gh release create ui-screens ui-screens.zip --title "UI füstteszt képernyőképei" --notes "Automatikus emulátoros füstteszt (szimulációs mód)." --prerelease --target "${GITHUB_SHA}" || true
+fi
 if grep -q "FAILURES!!!\|INSTRUMENTATION_FAILED\|Process crashed" "$OUT/instrument.txt"; then
   echo "A füstteszt SIKERTELEN"; exit 1
 fi
