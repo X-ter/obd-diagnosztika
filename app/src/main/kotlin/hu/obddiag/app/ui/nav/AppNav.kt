@@ -21,6 +21,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -124,6 +125,7 @@ fun AppRoot() {
                     NavigationBarItem(
                         selected = selected,
                         onClick = { nav.navigateTab(tab.route) },
+                        modifier = Modifier.testTag("tab_${tab.route}"),
                         icon = { Icon(tab.icon, null) },
                         label = { Text(stringResource(tab.label), maxLines = 1, overflow = TextOverflow.Ellipsis) },
                         colors = NavigationBarItemDefaults.colors(

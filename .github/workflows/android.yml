@@ -74,3 +74,40 @@ jobs:
             --title "OBD Diagnosztika – legfrissebb debug build (#${{ github.run_number }})" \
             --notes "Automatikusan fordított debug APK a(z) ${GITHUB_SHA::7} commitból. Telepítés: töltsd le a telefonra, és engedélyezd az ismeretlen forrásból származó alkalmazások telepítését." \
             --prerelease --target "$GITHUB_SHA"
+
+  ui-smoke-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+      - name: APK-k fordítása a teszthez
+        run: ./gradlew --no-daemon :app:assembleDebug :app:assembleDebugAndroidTest
+      - name: KVM engedélyezése
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Füstteszt Android emulátoron (szimulációs mód)
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          target: google_apis
+          arch: x86_64
+          profile: pixel_5
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: bash .github/scripts/smoke.sh
+      - name: Képernyőképek és naplók feltöltése
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-smoke-screens
+          path: smoke-output/
+          if-no-files-found: ignore
