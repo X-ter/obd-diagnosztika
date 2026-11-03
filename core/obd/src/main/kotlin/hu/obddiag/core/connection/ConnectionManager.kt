@@ -1,0 +1,225 @@
+package hu.obddiag.core.connection
+
+import hu.obddiag.core.AdapterInfo
+import hu.obddiag.core.ObdClient
+import hu.obddiag.core.ObdException
+import hu.obddiag.core.VehicleConnectionInfo
+import hu.obddiag.core.elm.ElmSession
+import hu.obddiag.core.elm.ObdProtocol
+import hu.obddiag.core.poll.PidPoller
+import hu.obddiag.core.transport.ObdTransport
+import hu.obddiag.core.transport.TransportException
+import hu.obddiag.core.transport.TransportType
+import hu.obddiag.core.util.CommLog
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+
+/** A kapcsolat állapotai, a felületen ezek alapján jelenik meg az animált kijelző. */
+sealed class ConnectionState {
+    data object Disconnected : ConnectionState()
+    data class ConnectingAdapter(val target: String) : ConnectionState()
+    data class InitializingAdapter(val target: String) : ConnectionState()
+    data class ConnectingVehicle(val adapter: AdapterInfo) : ConnectionState()
+    /** Az adapter él, de a jármű (ECU) nem válaszol – pl. ki van kapcsolva a gyújtás. */
+    data class AdapterOnly(val adapter: AdapterInfo, val reason: String) : ConnectionState()
+    data class Connected(val adapter: AdapterInfo, val vehicle: VehicleConnectionInfo, val simulated: Boolean) : ConnectionState()
+    data class Reconnecting(val attempt: Int, val maxAttempts: Int, val reason: String) : ConnectionState()
+    data class Failed(val reason: String, val detail: String?) : ConnectionState()
+
+    val isVehicleConnected: Boolean get() = this is Connected
+    val isAdapterConnected: Boolean get() = this is Connected || this is AdapterOnly || this is ConnectingVehicle
+}
+
+/** Hogyan hozható létre (újra) a transport – az újracsatlakozáshoz kell. */
+fun interface TransportFactory {
+    fun create(): ObdTransport
+}
+
+/**
+ * Életciklus-kezelő: kapcsolódás, inicializálás, járműkapcsolat, figyelés és automatikus újracsatlakozás.
+ * Egy példány az alkalmazás teljes élettartama alatt él.
+ */
+class ConnectionManager(
+    private val scope: CoroutineScope,
+    val commLog: CommLog = CommLog()
+) {
+    private val _state = MutableStateFlow<ConnectionState>(ConnectionState.Disconnected)
+    val state: StateFlow<ConnectionState> = _state.asStateFlow()
+
+    private val _client = MutableStateFlow<ObdClient?>(null)
+    /** Az aktív kliens; csak [ConnectionState.Connected] vagy [ConnectionState.AdapterOnly] állapotban nem null. */
+    val client: StateFlow<ObdClient?> = _client.asStateFlow()
+
+    private val _poller = MutableStateFlow<PidPoller?>(null)
+    val poller: StateFlow<PidPoller?> = _poller.asStateFlow()
+
+    private var transport: ObdTransport? = null
+    private var factory: TransportFactory? = null
+    private var protocol: ObdProtocol = ObdProtocol.AUTO
+    private var connectJob: Job? = null
+    private var watchdogJob: Job? = null
+    private val lifecycle = Mutex()
+
+    @Volatile var autoReconnect: Boolean = true
+    var maxReconnectAttempts: Int = 5
+
+    val isSimulated: Boolean get() = transport?.type == TransportType.SIMULATION
+
+    fun connect(factory: TransportFactory, protocol: ObdProtocol = ObdProtocol.AUTO) {
+        connectJob?.cancel()
+        this.factory = factory
+        this.protocol = protocol
+        connectJob = scope.launch {
+            lifecycle.withLock {
+                teardown()
+                establish(isReconnect = false)
+            }
+        }
+    }
+
+    fun disconnect() {
+        connectJob?.cancel()
+        factory = null
+        scope.launch {
+            lifecycle.withLock {
+                teardown()
+                _state.value = ConnectionState.Disconnected
+                commLog.add(CommLog.Direction.INFO, "Kapcsolat bontva")
+            }
+        }
+    }
+
+    /** Újrapróbálkozás a járműkapcsolattal (pl. gyújtás bekapcsolása után), az adapter újraindítása nélkül. */
+    fun retryVehicle() {
+        val c = _client.value ?: return
+        connectJob?.cancel()
+        connectJob = scope.launch {
+            lifecycle.withLock { connectVehicle(c, c.adapterInfo ?: return@withLock) }
+        }
+    }
+
+    private suspend fun establish(isReconnect: Boolean): Boolean {
+        val f = factory ?: return false
+        val t = f.create()
+        transport = t
+        if (!isReconnect) _state.value = ConnectionState.ConnectingAdapter(t.description)
+        commLog.add(CommLog.Direction.INFO, "Kapcsolódás: ${t.description}")
+        try {
+            t.connect()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            commLog.add(CommLog.Direction.ERROR, "Kapcsolódási hiba: ${e.message}")
+            if (!isReconnect) _state.value = ConnectionState.Failed("Nem sikerült kapcsolódni az adapterhez", e.message)
+            safeClose(t)
+            return false
+        }
+        if (!isReconnect) _state.value = ConnectionState.InitializingAdapter(t.description)
+        val session = ElmSession(t, commLog)
+        val client = ObdClient(session)
+        val adapter = try {
+            client.initializeAdapter()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            commLog.add(CommLog.Direction.ERROR, "Inicializálási hiba: ${e.message}")
+            if (!isReconnect) _state.value = ConnectionState.Failed(
+                "Az eszköz nem válaszol ELM327-ként",
+                "Ellenőrizd, hogy OBD-II adapterhez csatlakoztál-e. (${e.message})"
+            )
+            safeClose(t)
+            return false
+        }
+        commLog.add(CommLog.Direction.INFO, "Adapter: ${adapter.elmVersion}${adapter.stnVersion?.let { " / $it" } ?: ""}")
+        _client.value = client
+        connectVehicle(client, adapter)
+        startWatchdog()
+        return true
+    }
+
+    private suspend fun connectVehicle(client: ObdClient, adapter: AdapterInfo) {
+        _state.value = ConnectionState.ConnectingVehicle(adapter)
+        try {
+            val vehicle = client.connectVehicle(protocol)
+            client.discoverSupported(0x01)
+            client.probeOptimizations()
+            commLog.add(CommLog.Direction.INFO,
+                "Jármű: ${vehicle.protocol.displayName}, ECU-k: ${vehicle.ecus.joinToString()}, " +
+                    "PID-ek: ${client.supportedPids.size}, multi-PID: ${client.multiPidSupported}")
+            val poller = PidPoller(client, simulated = isSimulated)
+            _poller.value = poller
+            _state.value = ConnectionState.Connected(adapter, vehicle, isSimulated)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: ObdException) {
+            _state.value = ConnectionState.AdapterOnly(adapter, e.message ?: "A jármű nem válaszol")
+        } catch (e: TransportException) {
+            onConnectionLost(e.message ?: "A kapcsolat megszakadt")
+        }
+    }
+
+    private fun startWatchdog() {
+        watchdogJob?.cancel()
+        watchdogJob = scope.launch {
+            while (isActive) {
+                delay(1_000)
+                val t = transport ?: break
+                val session = _client.value?.session
+                val lost = !t.isConnected || (session != null && session.consecutiveTimeouts >= TIMEOUTS_BEFORE_LOSS)
+                if (lost) {
+                    onConnectionLost(if (!t.isConnected) "Az adapter kapcsolata megszakadt" else "Az adapter nem válaszol")
+                    break
+                }
+            }
+        }
+    }
+
+    private fun onConnectionLost(reason: String) {
+        commLog.add(CommLog.Direction.ERROR, "Kapcsolatvesztés: $reason")
+        connectJob?.cancel()
+        connectJob = scope.launch {
+            lifecycle.withLock {
+                teardown(keepFactory = true)
+                if (!autoReconnect || factory == null) {
+                    _state.value = ConnectionState.Failed(reason, null)
+                    return@withLock
+                }
+                for (attempt in 1..maxReconnectAttempts) {
+                    _state.value = ConnectionState.Reconnecting(attempt, maxReconnectAttempts, reason)
+                    delay(backoffMs(attempt))
+                    if (establish(isReconnect = true)) return@withLock
+                }
+                _state.value = ConnectionState.Failed(reason, "Az automatikus újracsatlakozás $maxReconnectAttempts próbálkozás után sem sikerült.")
+            }
+        }
+    }
+
+    private fun backoffMs(attempt: Int): Long = (1_000L shl (attempt - 1).coerceAtMost(4)).coerceAtMost(15_000L)
+
+    private suspend fun teardown(keepFactory: Boolean = true) {
+        watchdogJob?.cancel()
+        watchdogJob = null
+        _poller.value = null
+        _client.value = null
+        transport?.let { safeClose(it) }
+        transport = null
+        if (!keepFactory) factory = null
+    }
+
+    private suspend fun safeClose(t: ObdTransport) {
+        try { t.close() } catch (_: Exception) { }
+    }
+
+    companion object {
+        const val TIMEOUTS_BEFORE_LOSS = 4
+    }
+}

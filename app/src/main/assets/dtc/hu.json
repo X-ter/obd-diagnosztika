@@ -1,0 +1,1262 @@
+{
+ "P0010": {
+  "d": "„A” vezérműtengely-állító áramkör (1. hengersor)",
+  "c": [
+   "Hibás vezérműtengely-állító mágnesszelep",
+   "Vezetékezési vagy csatlakozóhiba"
+  ]
+ },
+ "P0011": {
+  "d": "„A” vezérműtengely helyzete – túl korai időzítés vagy rendszerhiba (1. hengersor)",
+  "c": [
+   "Alacsony olajszint vagy nem megfelelő viszkozitású olaj",
+   "Szennyezett vagy beragadt állítószelep (OCV)",
+   "Vezérműlánc nyúlása"
+  ],
+  "t": [
+   "Ellenőrizd az olajszintet és az olaj állapotát",
+   "Élő adatban hasonlítsd össze a cél- és tényleges vezérlési szöget (gyártóspecifikus)"
+  ]
+ },
+ "P0012": {
+  "d": "„A” vezérműtengely helyzete – túl késői időzítés (1. hengersor)",
+  "c": [
+   "Alacsony olajnyomás",
+   "Beragadt állítószelep",
+   "Vezérműlánc nyúlása"
+  ]
+ },
+ "P0016": {
+  "d": "Főtengely- és vezérműtengely-helyzet összefüggési hiba (1. hengersor, „A” érzékelő)",
+  "c": [
+   "Vezérműlánc vagy -szíj nyúlása, átugrása",
+   "Hibás főtengely- vagy vezérműtengely-érzékelő",
+   "Vezérműtengely-állító hiba"
+  ],
+  "t": [
+   "Ne használd hosszan a járművet, amíg a vezérlés állapota nincs ellenőrizve"
+  ]
+ },
+ "P0030": {
+  "d": "Lambdaszonda-fűtés vezérlő áramkör (1. hengersor, 1. szonda)",
+  "c": [
+   "Szakadt fűtőszál a szondában",
+   "Kiégett biztosíték",
+   "Vezetékezési hiba"
+  ]
+ },
+ "P0036": {
+  "d": "Lambdaszonda-fűtés vezérlő áramkör (1. hengersor, 2. szonda)",
+  "c": [
+   "Szakadt fűtőszál a szondában",
+   "Kiégett biztosíték",
+   "Vezetékezési hiba"
+  ]
+ },
+ "P0068": {
+  "d": "Szívócsőnyomás / légtömegáram – fojtószelep-helyzet összefüggési hiba",
+  "c": [
+   "Fals levegő",
+   "Hibás MAF- vagy MAP-érzékelő",
+   "Fojtószelep-hiba"
+  ]
+ },
+ "P0087": {
+  "d": "Üzemanyag-rail / rendszernyomás túl alacsony",
+  "c": [
+   "Eltömődött üzemanyagszűrő",
+   "Gyenge alacsony nyomású szivattyú",
+   "Hibás nagynyomású szivattyú vagy nyomásszabályozó",
+   "Szivárgás"
+  ],
+  "t": [
+   "Élő adatban hasonlítsd össze az előírt és a tényleges rail-nyomást (ha a jármű megadja)"
+  ]
+ },
+ "P0088": {
+  "d": "Üzemanyag-rail / rendszernyomás túl magas",
+  "c": [
+   "Hibás nyomásszabályozó szelep",
+   "Hibás rail-nyomásérzékelő"
+  ]
+ },
+ "P0089": {
+  "d": "Üzemanyagnyomás-szabályozó teljesítményhiba",
+  "c": [
+   "Hibás nyomásszabályozó",
+   "Szennyezett üzemanyag"
+  ]
+ },
+ "P0093": {
+  "d": "Nagy üzemanyag-szivárgás észlelve",
+  "c": [
+   "Üzemanyag-szivárgás a nagynyomású körben",
+   "Hibás rail-nyomásérzékelő"
+  ],
+  "t": [
+   "Ellenőrizd szemrevételezéssel a nagynyomású vezetékeket – tűzveszély!"
+  ]
+ },
+ "P0100": {
+  "d": "Légtömegmérő (MAF) áramkör hibája",
+  "c": [
+   "Csatlakozó- vagy vezetékhiba",
+   "Hibás légtömegmérő"
+  ]
+ },
+ "P0101": {
+  "d": "Légtömegmérő (MAF) – mérési tartomány / teljesítmény hiba",
+  "c": [
+   "Szennyezett MAF-érzékelő",
+   "Fals levegő a MAF után",
+   "Eltömődött légszűrő",
+   "Kipufogó-ellennyomás"
+  ],
+  "t": [
+   "Alapjáraton a MAF értéke jellemzően 2–7 g/s a motortól függően; hasonlítsd a gyári értékhez",
+   "Ellenőrizd a szívóoldali tömítettséget"
+  ]
+ },
+ "P0102": {
+  "d": "Légtömegmérő (MAF) – alacsony bemenő jel",
+  "c": [
+   "Szakadt vagy zárlatos vezeték",
+   "Hibás érzékelő",
+   "Hiányzó tápfeszültség"
+  ]
+ },
+ "P0103": {
+  "d": "Légtömegmérő (MAF) – magas bemenő jel",
+  "c": [
+   "Zárlat tápfeszültségre",
+   "Hibás érzékelő"
+  ]
+ },
+ "P0106": {
+  "d": "Szívócső abszolút nyomása (MAP) / barometrikus nyomás – tartomány / teljesítmény",
+  "c": [
+   "Vákuumszivárgás",
+   "Hibás MAP-érzékelő",
+   "Eldugult érzékelőcső"
+  ]
+ },
+ "P0107": {
+  "d": "Szívócsőnyomás (MAP) / barometrikus nyomás – alacsony bemenő jel",
+  "c": [
+   "Szakadt jelvezeték",
+   "Hibás érzékelő"
+  ]
+ },
+ "P0108": {
+  "d": "Szívócsőnyomás (MAP) / barometrikus nyomás – magas bemenő jel",
+  "c": [
+   "Zárlat",
+   "Hibás érzékelő",
+   "Vákuumcső leesett"
+  ]
+ },
+ "P0110": {
+  "d": "Szívólevegő-hőmérséklet érzékelő áramkör",
+  "c": [
+   "Vezeték- vagy csatlakozóhiba",
+   "Hibás érzékelő"
+  ]
+ },
+ "P0112": {
+  "d": "Szívólevegő-hőmérséklet érzékelő – alacsony bemenő jel",
+  "c": [
+   "Zárlat a testre",
+   "Hibás érzékelő"
+  ]
+ },
+ "P0113": {
+  "d": "Szívólevegő-hőmérséklet érzékelő – magas bemenő jel",
+  "c": [
+   "Szakadt vezeték vagy kontakthiba",
+   "Hibás érzékelő"
+  ],
+  "t": [
+   "Élő adatban −40 °C körüli érték szakadásra utal"
+  ]
+ },
+ "P0115": {
+  "d": "Hűtőfolyadék-hőmérséklet érzékelő áramkör",
+  "c": [
+   "Vezeték- vagy csatlakozóhiba",
+   "Hibás érzékelő"
+  ]
+ },
+ "P0116": {
+  "d": "Hűtőfolyadék-hőmérséklet érzékelő – tartomány / teljesítmény",
+  "c": [
+   "Hibás érzékelő",
+   "Hibás termosztát"
+  ]
+ },
+ "P0117": {
+  "d": "Hűtőfolyadék-hőmérséklet érzékelő – alacsony bemenő jel",
+  "c": [
+   "Zárlat a testre",
+   "Hibás érzékelő"
+  ]
+ },
+ "P0118": {
+  "d": "Hűtőfolyadék-hőmérséklet érzékelő – magas bemenő jel",
+  "c": [
+   "Szakadt vezeték",
+   "Hibás érzékelő"
+  ]
+ },
+ "P0120": {
+  "d": "Fojtószelep / pedál helyzetérzékelő „A” áramkör",
+  "c": [
+   "Vezeték- vagy csatlakozóhiba",
+   "Hibás érzékelő"
+  ]
+ },
+ "P0121": {
+  "d": "Fojtószelep / pedál helyzetérzékelő „A” – tartomány / teljesítmény",
+  "c": [
+   "Kopott vagy hibás érzékelő",
+   "Szennyezett fojtószelep-ház"
+  ]
+ },
+ "P0122": {
+  "d": "Fojtószelep / pedál helyzetérzékelő „A” – alacsony bemenő jel",
+  "c": [
+   "Szakadt vezeték",
+   "Hibás érzékelő"
+  ]
+ },
+ "P0123": {
+  "d": "Fojtószelep / pedál helyzetérzékelő „A” – magas bemenő jel",
+  "c": [
+   "Zárlat",
+   "Hibás érzékelő"
+  ]
+ },
+ "P0125": {
+  "d": "A hűtőfolyadék hőmérséklete nem elegendő a zárt hurkú üzemanyag-szabályozáshoz",
+  "c": [
+   "Nyitva ragadt termosztát",
+   "Hibás hűtőfolyadék-hőmérséklet érzékelő",
+   "Alacsony hűtőfolyadék-szint"
+  ]
+ },
+ "P0128": {
+  "d": "A hűtőfolyadék hőmérséklete a termosztát szabályozási hőmérséklete alatt van",
+  "c": [
+   "Nyitva ragadt vagy hibás termosztát",
+   "Hibás hűtőfolyadék-hőmérséklet érzékelő",
+   "Folyamatosan működő hűtőventilátor"
+  ],
+  "t": [
+   "Élő adatban kövesd a bemelegedést: a motor 10–15 perc alatt jellemzően 80–95 °C-ra melegszik"
+  ]
+ },
+ "P0130": {
+  "d": "Lambdaszonda áramkör (1. hengersor, 1. szonda)",
+  "c": [
+   "Hibás szonda",
+   "Vezetékezési hiba",
+   "Kipufogó-szivárgás"
+  ]
+ },
+ "P0131": {
+  "d": "Lambdaszonda – alacsony feszültség (1. hengersor, 1. szonda)",
+  "c": [
+   "Szegény keverék",
+   "Fals levegő",
+   "Hibás szonda",
+   "Zárlat a testre"
+  ]
+ },
+ "P0132": {
+  "d": "Lambdaszonda – magas feszültség (1. hengersor, 1. szonda)",
+  "c": [
+   "Dús keverék",
+   "Zárlat a tápfeszültségre",
+   "Hibás szonda"
+  ]
+ },
+ "P0133": {
+  "d": "Lambdaszonda – lassú válasz (1. hengersor, 1. szonda)",
+  "c": [
+   "Elöregedett vagy szennyezett szonda",
+   "Kipufogó-szivárgás",
+   "Fals levegő"
+  ],
+  "t": [
+   "Élő adatban egy jó keskenysávú szonda zárt hurokban gyorsan, kb. 0,1–0,9 V között változik"
+  ]
+ },
+ "P0134": {
+  "d": "Lambdaszonda – nincs aktivitás (1. hengersor, 1. szonda)",
+  "c": [
+   "Hibás szonda",
+   "Szakadt vezeték",
+   "Hibás szondafűtés"
+  ]
+ },
+ "P0135": {
+  "d": "Lambdaszonda-fűtés áramkör (1. hengersor, 1. szonda)",
+  "c": [
+   "Szakadt fűtőszál",
+   "Kiégett biztosíték",
+   "Vezetékezési hiba"
+  ]
+ },
+ "P0136": {
+  "d": "Lambdaszonda áramkör (1. hengersor, 2. szonda)",
+  "c": [
+   "Hibás szonda",
+   "Vezetékezési hiba"
+  ]
+ },
+ "P0137": {
+  "d": "Lambdaszonda – alacsony feszültség (1. hengersor, 2. szonda)",
+  "c": [
+   "Kipufogó-szivárgás",
+   "Hibás szonda"
+  ]
+ },
+ "P0138": {
+  "d": "Lambdaszonda – magas feszültség (1. hengersor, 2. szonda)",
+  "c": [
+   "Zárlat",
+   "Hibás szonda",
+   "Dús keverék"
+  ]
+ },
+ "P0141": {
+  "d": "Lambdaszonda-fűtés áramkör (1. hengersor, 2. szonda)",
+  "c": [
+   "Szakadt fűtőszál",
+   "Kiégett biztosíték",
+   "Vezetékezési hiba"
+  ]
+ },
+ "P0150": {
+  "d": "Lambdaszonda áramkör (2. hengersor, 1. szonda)",
+  "c": [
+   "Hibás szonda",
+   "Vezetékezési hiba"
+  ]
+ },
+ "P0151": {
+  "d": "Lambdaszonda – alacsony feszültség (2. hengersor, 1. szonda)",
+  "c": [
+   "Szegény keverék",
+   "Fals levegő",
+   "Hibás szonda"
+  ]
+ },
+ "P0153": {
+  "d": "Lambdaszonda – lassú válasz (2. hengersor, 1. szonda)",
+  "c": [
+   "Elöregedett szonda",
+   "Kipufogó-szivárgás"
+  ]
+ },
+ "P0155": {
+  "d": "Lambdaszonda-fűtés áramkör (2. hengersor, 1. szonda)",
+  "c": [
+   "Szakadt fűtőszál",
+   "Kiégett biztosíték"
+  ]
+ },
+ "P0161": {
+  "d": "Lambdaszonda-fűtés áramkör (2. hengersor, 2. szonda)",
+  "c": [
+   "Szakadt fűtőszál",
+   "Kiégett biztosíték"
+  ]
+ },
+ "P0171": {
+  "d": "A rendszer túl szegény (1. hengersor)",
+  "c": [
+   "Fals levegő (szívócső-tömítés, vákuumcső, PCV) a légtömegmérő után",
+   "Szennyezett vagy hibás légtömegmérő (MAF)",
+   "Alacsony üzemanyagnyomás (szivattyú, szűrő, nyomásszabályozó)",
+   "Eltömődött vagy hibás befecskendezők",
+   "Kipufogó-szivárgás a lambdaszonda előtt"
+  ],
+  "t": [
+   "Nézd meg élő adatban a rövid és hosszú távú korrekciót alapjáraton és 2500/min-en",
+   "Füstteszttel keress fals levegőt",
+   "Mérd meg az üzemanyagnyomást"
+  ]
+ },
+ "P0172": {
+  "d": "A rendszer túl dús (1. hengersor)",
+  "c": [
+   "Túl magas üzemanyagnyomás vagy szivárgó befecskendező",
+   "Hibás légtömegmérő vagy MAP-érzékelő",
+   "Eltömődött légszűrő",
+   "Hibás hűtőfolyadék-hőmérséklet-érzékelő (hideg motort jelez)",
+   "EVAP-öblítőszelep nyitva ragadt"
+  ]
+ },
+ "P0174": {
+  "d": "A rendszer túl szegény (2. hengersor)",
+  "c": [
+   "Fals levegő (szívócső-tömítés, vákuumcső, PCV) a légtömegmérő után",
+   "Szennyezett vagy hibás légtömegmérő (MAF)",
+   "Alacsony üzemanyagnyomás (szivattyú, szűrő, nyomásszabályozó)",
+   "Eltömődött vagy hibás befecskendezők",
+   "Kipufogó-szivárgás a lambdaszonda előtt"
+  ],
+  "t": [
+   "Nézd meg élő adatban a rövid és hosszú távú korrekciót alapjáraton és 2500/min-en",
+   "Füstteszttel keress fals levegőt",
+   "Mérd meg az üzemanyagnyomást"
+  ]
+ },
+ "P0175": {
+  "d": "A rendszer túl dús (2. hengersor)",
+  "c": [
+   "Túl magas üzemanyagnyomás vagy szivárgó befecskendező",
+   "Hibás légtömegmérő vagy MAP-érzékelő",
+   "Eltömődött légszűrő",
+   "Hibás hűtőfolyadék-hőmérséklet-érzékelő (hideg motort jelez)",
+   "EVAP-öblítőszelep nyitva ragadt"
+  ]
+ },
+ "P0190": {
+  "d": "Üzemanyag-rail nyomásérzékelő „A” áramkör",
+  "c": [
+   "Vezeték- vagy csatlakozóhiba",
+   "Hibás érzékelő"
+  ]
+ },
+ "P0191": {
+  "d": "Üzemanyag-rail nyomásérzékelő „A” – tartomány / teljesítmény",
+  "c": [
+   "Hibás érzékelő",
+   "Üzemanyag-ellátási hiba"
+  ]
+ },
+ "P0192": {
+  "d": "Üzemanyag-rail nyomásérzékelő „A” – alacsony bemenő jel",
+  "c": [
+   "Szakadt vezeték",
+   "Hibás érzékelő"
+  ]
+ },
+ "P0193": {
+  "d": "Üzemanyag-rail nyomásérzékelő „A” – magas bemenő jel",
+  "c": [
+   "Zárlat",
+   "Hibás érzékelő"
+  ]
+ },
+ "P0200": {
+  "d": "Befecskendező áramkör / nyitott",
+  "c": [
+   "Vezetékezési hiba",
+   "Hibás befecskendező",
+   "Vezérlőegység-kimenet hibája"
+  ]
+ },
+ "P0201": {
+  "d": "Befecskendező áramkör / nyitott – 1. henger",
+  "c": [
+   "Szakadt vezeték vagy csatlakozóhiba",
+   "Hibás befecskendező tekercs"
+  ],
+  "t": [
+   "Mérd meg a befecskendező tekercsellenállását, és hasonlítsd össze a többi hengerével"
+  ]
+ },
+ "P0202": {
+  "d": "Befecskendező áramkör / nyitott – 2. henger",
+  "c": [
+   "Szakadt vezeték vagy csatlakozóhiba",
+   "Hibás befecskendező tekercs"
+  ],
+  "t": [
+   "Mérd meg a befecskendező tekercsellenállását, és hasonlítsd össze a többi hengerével"
+  ]
+ },
+ "P0203": {
+  "d": "Befecskendező áramkör / nyitott – 3. henger",
+  "c": [
+   "Szakadt vezeték vagy csatlakozóhiba",
+   "Hibás befecskendező tekercs"
+  ],
+  "t": [
+   "Mérd meg a befecskendező tekercsellenállását, és hasonlítsd össze a többi hengerével"
+  ]
+ },
+ "P0204": {
+  "d": "Befecskendező áramkör / nyitott – 4. henger",
+  "c": [
+   "Szakadt vezeték vagy csatlakozóhiba",
+   "Hibás befecskendező tekercs"
+  ],
+  "t": [
+   "Mérd meg a befecskendező tekercsellenállását, és hasonlítsd össze a többi hengerével"
+  ]
+ },
+ "P0205": {
+  "d": "Befecskendező áramkör / nyitott – 5. henger",
+  "c": [
+   "Szakadt vezeték vagy csatlakozóhiba",
+   "Hibás befecskendező tekercs"
+  ],
+  "t": [
+   "Mérd meg a befecskendező tekercsellenállását, és hasonlítsd össze a többi hengerével"
+  ]
+ },
+ "P0206": {
+  "d": "Befecskendező áramkör / nyitott – 6. henger",
+  "c": [
+   "Szakadt vezeték vagy csatlakozóhiba",
+   "Hibás befecskendező tekercs"
+  ],
+  "t": [
+   "Mérd meg a befecskendező tekercsellenállását, és hasonlítsd össze a többi hengerével"
+  ]
+ },
+ "P0207": {
+  "d": "Befecskendező áramkör / nyitott – 7. henger",
+  "c": [
+   "Szakadt vezeték vagy csatlakozóhiba",
+   "Hibás befecskendező tekercs"
+  ],
+  "t": [
+   "Mérd meg a befecskendező tekercsellenállását, és hasonlítsd össze a többi hengerével"
+  ]
+ },
+ "P0208": {
+  "d": "Befecskendező áramkör / nyitott – 8. henger",
+  "c": [
+   "Szakadt vezeték vagy csatlakozóhiba",
+   "Hibás befecskendező tekercs"
+  ],
+  "t": [
+   "Mérd meg a befecskendező tekercsellenállását, és hasonlítsd össze a többi hengerével"
+  ]
+ },
+ "P0217": {
+  "d": "Motor túlmelegedés",
+  "c": [
+   "Alacsony hűtőfolyadék-szint",
+   "Hibás termosztát vagy vízpumpa",
+   "Hűtőventilátor-hiba",
+   "Eltömődött hűtő"
+  ],
+  "t": [
+   "Azonnal állítsd le a motort, és hagyd lehűlni – a hűtőrendszer forró állapotban ne nyisd ki!"
+  ]
+ },
+ "P0234": {
+  "d": "Turbó- / kompresszortúltöltés",
+  "c": [
+   "Beragadt waste-gate vagy VGT-mechanizmus",
+   "Hibás töltőnyomás-szabályozó szelep",
+   "Hibás töltőnyomás-érzékelő"
+  ]
+ },
+ "P0235": {
+  "d": "Töltőnyomás-érzékelő „A” áramkör",
+  "c": [
+   "Vezeték- vagy csatlakozóhiba",
+   "Hibás érzékelő"
+  ]
+ },
+ "P0236": {
+  "d": "Töltőnyomás-érzékelő „A” – tartomány / teljesítmény",
+  "c": [
+   "Hibás érzékelő",
+   "Szivárgás a töltőlevegő-rendszerben"
+  ]
+ },
+ "P0237": {
+  "d": "Töltőnyomás-érzékelő „A” – alacsony bemenő jel",
+  "c": [
+   "Szakadt vezeték",
+   "Hibás érzékelő"
+  ]
+ },
+ "P0238": {
+  "d": "Töltőnyomás-érzékelő „A” – magas bemenő jel",
+  "c": [
+   "Zárlat",
+   "Hibás érzékelő"
+  ]
+ },
+ "P0299": {
+  "d": "Turbó- / kompresszor – alacsony töltőnyomás",
+  "c": [
+   "Szivárgás a töltőlevegő-csövekben vagy az intercoolerben",
+   "Hibás töltőnyomás-szabályozás (vákuumdoboz, szelep)",
+   "Turbófeltöltő-hiba",
+   "Eltömődött részecskeszűrő vagy katalizátor"
+  ],
+  "t": [
+   "Ellenőrizd a töltőlevegő-rendszer tömítettségét",
+   "Ha a jármű támogatja, hasonlítsd össze az előírt és a tényleges töltőnyomást"
+  ]
+ },
+ "P0300": {
+  "d": "Véletlenszerű vagy több hengeres gyújtáskimaradás",
+  "c": [
+   "Hibás gyújtógyertya vagy gyújtótekercs",
+   "Befecskendező-hiba",
+   "Alacsony kompresszió (szelep, gyűrű, hengerfejtömítés)",
+   "Fals levegő",
+   "Vezetékezési hiba",
+   "Szegény keverék"
+  ],
+  "t": [
+   "Cseréld fel az érintett henger tekercsét egy másikkal, és nézd meg, vándorol-e a hiba",
+   "Ellenőrizd a gyertyát",
+   "Szükség esetén végezz kompressziómérést"
+  ]
+ },
+ "P0301": {
+  "d": "Gyújtáskimaradás – 1. henger",
+  "c": [
+   "Hibás gyújtógyertya vagy gyújtótekercs",
+   "Befecskendező-hiba",
+   "Alacsony kompresszió (szelep, gyűrű, hengerfejtömítés)",
+   "Fals levegő",
+   "Vezetékezési hiba"
+  ],
+  "t": [
+   "Cseréld fel az érintett henger tekercsét egy másikkal, és nézd meg, vándorol-e a hiba",
+   "Ellenőrizd a gyertyát",
+   "Szükség esetén végezz kompressziómérést"
+  ]
+ },
+ "P0302": {
+  "d": "Gyújtáskimaradás – 2. henger",
+  "c": [
+   "Hibás gyújtógyertya vagy gyújtótekercs",
+   "Befecskendező-hiba",
+   "Alacsony kompresszió (szelep, gyűrű, hengerfejtömítés)",
+   "Fals levegő",
+   "Vezetékezési hiba"
+  ],
+  "t": [
+   "Cseréld fel az érintett henger tekercsét egy másikkal, és nézd meg, vándorol-e a hiba",
+   "Ellenőrizd a gyertyát",
+   "Szükség esetén végezz kompressziómérést"
+  ]
+ },
+ "P0303": {
+  "d": "Gyújtáskimaradás – 3. henger",
+  "c": [
+   "Hibás gyújtógyertya vagy gyújtótekercs",
+   "Befecskendező-hiba",
+   "Alacsony kompresszió (szelep, gyűrű, hengerfejtömítés)",
+   "Fals levegő",
+   "Vezetékezési hiba"
+  ],
+  "t": [
+   "Cseréld fel az érintett henger tekercsét egy másikkal, és nézd meg, vándorol-e a hiba",
+   "Ellenőrizd a gyertyát",
+   "Szükség esetén végezz kompressziómérést"
+  ]
+ },
+ "P0304": {
+  "d": "Gyújtáskimaradás – 4. henger",
+  "c": [
+   "Hibás gyújtógyertya vagy gyújtótekercs",
+   "Befecskendező-hiba",
+   "Alacsony kompresszió (szelep, gyűrű, hengerfejtömítés)",
+   "Fals levegő",
+   "Vezetékezési hiba"
+  ],
+  "t": [
+   "Cseréld fel az érintett henger tekercsét egy másikkal, és nézd meg, vándorol-e a hiba",
+   "Ellenőrizd a gyertyát",
+   "Szükség esetén végezz kompressziómérést"
+  ]
+ },
+ "P0305": {
+  "d": "Gyújtáskimaradás – 5. henger",
+  "c": [
+   "Hibás gyújtógyertya vagy gyújtótekercs",
+   "Befecskendező-hiba",
+   "Alacsony kompresszió (szelep, gyűrű, hengerfejtömítés)",
+   "Fals levegő",
+   "Vezetékezési hiba"
+  ],
+  "t": [
+   "Cseréld fel az érintett henger tekercsét egy másikkal, és nézd meg, vándorol-e a hiba",
+   "Ellenőrizd a gyertyát",
+   "Szükség esetén végezz kompressziómérést"
+  ]
+ },
+ "P0306": {
+  "d": "Gyújtáskimaradás – 6. henger",
+  "c": [
+   "Hibás gyújtógyertya vagy gyújtótekercs",
+   "Befecskendező-hiba",
+   "Alacsony kompresszió (szelep, gyűrű, hengerfejtömítés)",
+   "Fals levegő",
+   "Vezetékezési hiba"
+  ],
+  "t": [
+   "Cseréld fel az érintett henger tekercsét egy másikkal, és nézd meg, vándorol-e a hiba",
+   "Ellenőrizd a gyertyát",
+   "Szükség esetén végezz kompressziómérést"
+  ]
+ },
+ "P0307": {
+  "d": "Gyújtáskimaradás – 7. henger",
+  "c": [
+   "Hibás gyújtógyertya vagy gyújtótekercs",
+   "Befecskendező-hiba",
+   "Alacsony kompresszió (szelep, gyűrű, hengerfejtömítés)",
+   "Fals levegő",
+   "Vezetékezési hiba"
+  ],
+  "t": [
+   "Cseréld fel az érintett henger tekercsét egy másikkal, és nézd meg, vándorol-e a hiba",
+   "Ellenőrizd a gyertyát",
+   "Szükség esetén végezz kompressziómérést"
+  ]
+ },
+ "P0308": {
+  "d": "Gyújtáskimaradás – 8. henger",
+  "c": [
+   "Hibás gyújtógyertya vagy gyújtótekercs",
+   "Befecskendező-hiba",
+   "Alacsony kompresszió (szelep, gyűrű, hengerfejtömítés)",
+   "Fals levegő",
+   "Vezetékezési hiba"
+  ],
+  "t": [
+   "Cseréld fel az érintett henger tekercsét egy másikkal, és nézd meg, vándorol-e a hiba",
+   "Ellenőrizd a gyertyát",
+   "Szükség esetén végezz kompressziómérést"
+  ]
+ },
+ "P0325": {
+  "d": "Kopogásérzékelő 1. áramkör (1. hengersor vagy önálló érzékelő)",
+  "c": [
+   "Vezetékezési hiba",
+   "Hibás vagy lazán rögzített érzékelő"
+  ]
+ },
+ "P0327": {
+  "d": "Kopogásérzékelő 1. – alacsony bemenő jel",
+  "c": [
+   "Vezetékezési hiba",
+   "Nem megfelelő meghúzási nyomaték",
+   "Hibás érzékelő"
+  ]
+ },
+ "P0335": {
+  "d": "Főtengely-helyzetérzékelő „A” áramkör",
+  "c": [
+   "Hibás érzékelő",
+   "Sérült jeladó kerék",
+   "Vezetékezési hiba"
+  ],
+  "t": [
+   "Ez a hiba indítási nehézséget vagy leállást okozhat"
+  ]
+ },
+ "P0336": {
+  "d": "Főtengely-helyzetérzékelő „A” – tartomány / teljesítmény",
+  "c": [
+   "Szennyezett vagy sérült jeladó kerék",
+   "Hibás érzékelő",
+   "Laza csatlakozó"
+  ]
+ },
+ "P0340": {
+  "d": "Vezérműtengely-helyzetérzékelő „A” áramkör (1. hengersor)",
+  "c": [
+   "Hibás érzékelő",
+   "Vezetékezési hiba"
+  ]
+ },
+ "P0341": {
+  "d": "Vezérműtengely-helyzetérzékelő „A” – tartomány / teljesítmény (1. hengersor)",
+  "c": [
+   "Vezérlés átugrása",
+   "Hibás érzékelő",
+   "Sérült jeladó"
+  ]
+ },
+ "P0380": {
+  "d": "Izzítógyertya / izzítás „A” áramkör",
+  "c": [
+   "Hibás izzítógyertya",
+   "Hibás izzítórelé vagy -vezérlő",
+   "Vezetékezési hiba"
+  ]
+ },
+ "P0400": {
+  "d": "Kipufogógáz-visszavezetés (EGR) áramlási hiba",
+  "c": [
+   "Elkokszosodott EGR-szelep vagy -csatorna",
+   "Hibás EGR-szelep"
+  ]
+ },
+ "P0401": {
+  "d": "Kipufogógáz-visszavezetés (EGR) – elégtelen áramlás",
+  "c": [
+   "Elkokszosodott EGR-csatornák vagy szelep",
+   "Hibás EGR-szelep vagy -vezérlés",
+   "Hibás nyomás- vagy helyzetérzékelő"
+  ]
+ },
+ "P0402": {
+  "d": "Kipufogógáz-visszavezetés (EGR) – túlzott áramlás",
+  "c": [
+   "Nyitva ragadt EGR-szelep",
+   "Hibás vezérlés"
+  ]
+ },
+ "P0403": {
+  "d": "EGR „A” vezérlő áramkör",
+  "c": [
+   "Vezetékezési hiba",
+   "Hibás EGR-szelep tekercs"
+  ]
+ },
+ "P0404": {
+  "d": "EGR „A” vezérlés – tartomány / teljesítmény",
+  "c": [
+   "Szennyezett, akadozó EGR-szelep",
+   "Hibás helyzetérzékelő"
+  ]
+ },
+ "P0405": {
+  "d": "EGR „A” helyzetérzékelő – alacsony bemenő jel",
+  "c": [
+   "Vezetékezési hiba",
+   "Hibás érzékelő"
+  ]
+ },
+ "P0410": {
+  "d": "Szekunderlevegő-befúvó rendszer hibája",
+  "c": [
+   "Hibás szekunderlevegő-szivattyú",
+   "Beragadt visszacsapó szelep",
+   "Relé- vagy biztosítékhiba"
+  ]
+ },
+ "P0411": {
+  "d": "Szekunderlevegő-befúvó rendszer – helytelen áramlás",
+  "c": [
+   "Eltömődött csatornák",
+   "Hibás szelep vagy szivattyú"
+  ]
+ },
+ "P0420": {
+  "d": "A katalizátor hatásfoka a küszöbérték alatt (1. hengersor)",
+  "c": [
+   "Elöregedett vagy sérült katalizátor",
+   "Kipufogó-szivárgás",
+   "Hibás lambdaszonda (főleg a katalizátor utáni)",
+   "Gyújtáskimaradás vagy keverékhiba okozta károsodás"
+  ],
+  "t": [
+   "Előbb javítsd a gyújtás- és keverékhibákat, mert ezek a katalizátort is károsítják",
+   "Élő adatban a katalizátor utáni szonda jelének stabilnak kell lennie"
+  ]
+ },
+ "P0430": {
+  "d": "A katalizátor hatásfoka a küszöbérték alatt (2. hengersor)",
+  "c": [
+   "Elöregedett vagy sérült katalizátor",
+   "Kipufogó-szivárgás",
+   "Hibás lambdaszonda"
+  ]
+ },
+ "P0440": {
+  "d": "Párolgásiemisszió-szabályozó (EVAP) rendszer hibája",
+  "c": [
+   "Szivárgás",
+   "Hibás öblítő- vagy szellőztetőszelep"
+  ]
+ },
+ "P0441": {
+  "d": "EVAP – helytelen öblítési áramlás",
+  "c": [
+   "Hibás öblítőszelep",
+   "Eltömődött vagy leesett cső"
+  ]
+ },
+ "P0442": {
+  "d": "EVAP – kis szivárgás észlelve",
+  "c": [
+   "Rosszul záró tanksapka",
+   "Repedt EVAP-cső",
+   "Szivárgó szelep vagy aktívszén-tartály"
+  ],
+  "t": [
+   "Először ellenőrizd a tanksapka tömítését és zárását"
+  ]
+ },
+ "P0443": {
+  "d": "EVAP öblítőszelep vezérlő áramkör",
+  "c": [
+   "Vezetékezési hiba",
+   "Hibás szelep"
+  ]
+ },
+ "P0446": {
+  "d": "EVAP szellőztetőszelep vezérlő áramkör",
+  "c": [
+   "Vezetékezési hiba",
+   "Hibás vagy elszennyeződött szelep"
+  ]
+ },
+ "P0455": {
+  "d": "EVAP – nagy szivárgás észlelve",
+  "c": [
+   "Hiányzó vagy laza tanksapka",
+   "Leesett EVAP-cső",
+   "Hibás szelep"
+  ],
+  "t": [
+   "Először ellenőrizd a tanksapkát"
+  ]
+ },
+ "P0456": {
+  "d": "EVAP – nagyon kis szivárgás észlelve",
+  "c": [
+   "Tanksapka-tömítés",
+   "Apró repedés a csövekben"
+  ],
+  "t": [
+   "Füstteszttel lokalizálható"
+  ]
+ },
+ "P0457": {
+  "d": "EVAP – szivárgás észlelve (laza vagy hiányzó tanksapka)",
+  "c": [
+   "Laza, hiányzó vagy rossz tanksapka"
+  ]
+ },
+ "P0461": {
+  "d": "Üzemanyagszint-érzékelő „A” – tartomány / teljesítmény",
+  "c": [
+   "Hibás szintjeladó",
+   "Vezetékezési hiba"
+  ]
+ },
+ "P0480": {
+  "d": "Hűtőventilátor 1. vezérlő áramkör",
+  "c": [
+   "Hibás ventilátorrelé vagy -vezérlő",
+   "Vezetékezési hiba",
+   "Hibás ventilátormotor"
+  ]
+ },
+ "P0500": {
+  "d": "Járműsebesség-érzékelő „A” hiba",
+  "c": [
+   "Hibás sebességjeladó",
+   "ABS-kerékérzékelő-hiba (ha onnan származik a jel)",
+   "Vezetékezési hiba"
+  ]
+ },
+ "P0505": {
+  "d": "Alapjárat-szabályozó rendszer hibája",
+  "c": [
+   "Szennyezett fojtószelep-ház vagy alapjárati szelep",
+   "Fals levegő"
+  ]
+ },
+ "P0506": {
+  "d": "Alapjárat-szabályozó rendszer – a fordulatszám alacsonyabb az elvártnál",
+  "c": [
+   "Szennyezett fojtószelep-ház",
+   "Eltömődött légszűrő"
+  ]
+ },
+ "P0507": {
+  "d": "Alapjárat-szabályozó rendszer – a fordulatszám magasabb az elvártnál",
+  "c": [
+   "Fals levegő",
+   "Szennyezett vagy beragadt fojtószelep"
+  ]
+ },
+ "P0562": {
+  "d": "Rendszerfeszültség alacsony",
+  "c": [
+   "Gyenge akkumulátor",
+   "Hibás generátor vagy feszültségszabályzó",
+   "Rossz testkapcsolat"
+  ],
+  "t": [
+   "Járó motornál a töltőfeszültség jellemzően 13,8–14,8 V"
+  ]
+ },
+ "P0563": {
+  "d": "Rendszerfeszültség magas",
+  "c": [
+   "Hibás feszültségszabályzó / generátor"
+  ]
+ },
+ "P0571": {
+  "d": "Fékkapcsoló „A” áramkör",
+  "c": [
+   "Hibás vagy rosszul beállított féklámpakapcsoló",
+   "Vezetékezési hiba"
+  ]
+ },
+ "P0600": {
+  "d": "Soros kommunikációs kapcsolat hibája",
+  "c": [
+   "Kommunikációs hiba a vezérlőegységek között",
+   "Vezetékezési hiba"
+  ]
+ },
+ "P0601": {
+  "d": "Belső vezérlőmodul – memória-ellenőrzőösszeg hiba",
+  "c": [
+   "Vezérlőegység szoftver- vagy hardverhibája"
+  ]
+ },
+ "P0603": {
+  "d": "Belső vezérlőmodul – állandó memória (KAM) hiba",
+  "c": [
+   "Akkumulátor lekötése után átmenetileg is jelentkezhet",
+   "Vezérlőegység-hiba"
+  ]
+ },
+ "P0606": {
+  "d": "Vezérlőmodul processzorhiba",
+  "c": [
+   "Vezérlőegység-hiba",
+   "Tápellátási vagy testhiba"
+  ]
+ },
+ "P0627": {
+  "d": "Üzemanyag-szivattyú „A” vezérlő áramkör / nyitott",
+  "c": [
+   "Szivattyúrelé vagy -vezérlő hibája",
+   "Vezetékezési hiba"
+  ]
+ },
+ "P0641": {
+  "d": "Érzékelő-referenciafeszültség „A” áramkör / nyitott",
+  "c": [
+   "Zárlat egy ugyanerről a tápról járó érzékelőben",
+   "Vezetékezési hiba"
+  ]
+ },
+ "P0700": {
+  "d": "Sebességváltó-vezérlő rendszer hibája (MIL-kérés)",
+  "c": [
+   "A váltóvezérlő (TCM) saját hibakódot tárolt"
+  ],
+  "t": [
+   "A pontos ok a TCM hibakódjaiban található – ehhez gyártóspecifikus diagnosztika szükséges"
+  ]
+ },
+ "P0705": {
+  "d": "Váltókar-helyzetérzékelő „A” áramkör (PRNDL bemenet)",
+  "c": [
+   "Hibás vagy rosszul beállított érzékelő",
+   "Vezetékezési hiba"
+  ]
+ },
+ "P0715": {
+  "d": "Bemenő/turbinatengely fordulatszám-érzékelő „A” áramkör",
+  "c": [
+   "Hibás érzékelő",
+   "Vezetékezési hiba"
+  ]
+ },
+ "P0720": {
+  "d": "Kimenő tengely fordulatszám-érzékelő áramkör",
+  "c": [
+   "Hibás érzékelő",
+   "Vezetékezési hiba"
+  ]
+ },
+ "P0730": {
+  "d": "Helytelen áttétel",
+  "c": [
+   "Alacsony vagy elhasznált váltóolaj",
+   "Csúszó tengelykapcsolók",
+   "Hibás váltó-mágnesszelep"
+  ]
+ },
+ "P0740": {
+  "d": "Nyomatékváltó-áthidaló tengelykapcsoló (TCC) áramkör",
+  "c": [
+   "Hibás TCC mágnesszelep",
+   "Vezetékezési hiba"
+  ]
+ },
+ "P0741": {
+  "d": "Nyomatékváltó-áthidaló tengelykapcsoló (TCC) – teljesítmény / kikapcsolva ragadt",
+  "c": [
+   "Elhasznált váltóolaj",
+   "Hibás mágnesszelep",
+   "Belső váltóhiba"
+  ]
+ },
+ "P2002": {
+  "d": "Részecskeszűrő (DPF) hatásfoka a küszöbérték alatt (1. hengersor)",
+  "c": [
+   "Sérült vagy kiszerelt részecskeszűrő",
+   "Hibás nyomáskülönbség-érzékelő"
+  ]
+ },
+ "P2004": {
+  "d": "Szívócső-csappantyú beragadt nyitott helyzetben (1. hengersor)",
+  "c": [
+   "Elkokszosodott csappantyú",
+   "Hibás állítómotor vagy vákuumdoboz"
+  ]
+ },
+ "P2096": {
+  "d": "Katalizátor utáni keverékkorrekció – túl szegény (1. hengersor)",
+  "c": [
+   "Kipufogó-szivárgás",
+   "Hibás lambdaszonda",
+   "Szegény keverék"
+  ]
+ },
+ "P2097": {
+  "d": "Katalizátor utáni keverékkorrekció – túl dús (1. hengersor)",
+  "c": [
+   "Hibás lambdaszonda",
+   "Dús keverék",
+   "Katalizátorhiba"
+  ]
+ },
+ "P2135": {
+  "d": "Fojtószelep / pedál helyzetérzékelő „A” és „B” feszültség-összefüggési hiba",
+  "c": [
+   "Hibás fojtószelep-ház érzékelője",
+   "Vezetékezési vagy csatlakozóhiba"
+  ],
+  "t": [
+   "Ez a hiba vészüzemmódot (teljesítménykorlátozást) okozhat"
+  ]
+ },
+ "P2138": {
+  "d": "Pedálhelyzet-érzékelő „D” és „E” feszültség-összefüggési hiba",
+  "c": [
+   "Hibás gázpedál-modul",
+   "Vezetékezési hiba"
+  ]
+ },
+ "P2187": {
+  "d": "Alapjáraton túl szegény a rendszer (1. hengersor)",
+  "c": [
+   "Fals levegő (leggyakrabban alapjáraton jelentkezik)",
+   "PCV-hiba",
+   "Alacsony üzemanyagnyomás"
+  ],
+  "t": [
+   "Nézd meg élő adatban a rövid és hosszú távú korrekciót alapjáraton és 2500/min-en",
+   "Füstteszttel keress fals levegőt",
+   "Mérd meg az üzemanyagnyomást"
+  ]
+ },
+ "P2188": {
+  "d": "Alapjáraton túl dús a rendszer (1. hengersor)",
+  "c": [
+   "Szivárgó befecskendező",
+   "EVAP-öblítőszelep nyitva ragadt",
+   "Hibás nyomásszabályozó"
+  ]
+ },
+ "P242F": {
+  "d": "Részecskeszűrő (DPF) korlátozás – hamu felhalmozódás (1. hengersor)",
+  "c": [
+   "A DPF elérte a hamutelítettségi határt"
+  ],
+  "t": [
+   "A hamu regenerációval nem égethető ki: a szűrő tisztítása vagy cseréje szükséges"
+  ]
+ },
+ "P2452": {
+  "d": "Részecskeszűrő nyomáskülönbség-érzékelő „A” áramkör",
+  "c": [
+   "Hibás érzékelő",
+   "Vezetékezési hiba",
+   "Repedt vagy eldugult érzékelőcső"
+  ]
+ },
+ "P2453": {
+  "d": "Részecskeszűrő nyomáskülönbség-érzékelő „A” – tartomány / teljesítmény",
+  "c": [
+   "Eldugult vagy leesett érzékelőcső",
+   "Hibás érzékelő"
+  ]
+ },
+ "P2463": {
+  "d": "Részecskeszűrő (DPF) – koromfelhalmozódás (1. hengersor)",
+  "c": [
+   "Gyakori rövid utak miatt elmaradó regeneráció",
+   "Befecskendező-, EGR- vagy turbóhiba okozta fokozott koromképződés",
+   "Hibás nyomáskülönbség-érzékelő"
+  ],
+  "t": [
+   "Ha a jármű engedi, hosszabb, egyenletes autópályás út segítheti a regenerációt",
+   "Kényszerregeneráció csak gyártóspecifikus eszközzel indítható"
+  ]
+ },
+ "U0001": {
+  "d": "Nagysebességű CAN kommunikációs busz hiba",
+  "c": [
+   "Vezetékezési hiba vagy zárlat a buszon",
+   "Hibás vezérlőegység terheli a buszt",
+   "Lezáró ellenállás hibája"
+  ]
+ },
+ "U0073": {
+  "d": "Vezérlőmodul kommunikációs busz „A” – kikapcsolt (bus off)",
+  "c": [
+   "Busz-zárlat",
+   "Hibás vezérlőegység",
+   "Tápellátási hiba"
+  ]
+ },
+ "U0100": {
+  "d": "Megszakadt a kommunikáció az ECM/PCM „A” motorvezérlővel",
+  "c": [
+   "A motorvezérlő tápellátási vagy testhibája",
+   "CAN-vezetékezési hiba",
+   "Gyenge akkumulátor"
+  ],
+  "t": [
+   "Ellenőrizd az akkumulátor feszültségét és a vezérlőegység biztosítékait"
+  ]
+ },
+ "U0101": {
+  "d": "Megszakadt a kommunikáció a váltóvezérlővel (TCM)",
+  "c": [
+   "Tápellátási vagy testhiba",
+   "CAN-vezetékezési hiba"
+  ]
+ },
+ "U0121": {
+  "d": "Megszakadt a kommunikáció az ABS-vezérlővel",
+  "c": [
+   "Tápellátási vagy testhiba",
+   "CAN-vezetékezési hiba",
+   "ABS-modul hibája"
+  ]
+ },
+ "U0140": {
+  "d": "Megszakadt a kommunikáció a karosszéria-vezérlővel (BCM)",
+  "c": [
+   "Tápellátási vagy testhiba",
+   "CAN-vezetékezési hiba"
+  ]
+ },
+ "U0155": {
+  "d": "Megszakadt a kommunikáció a műszeregységgel (IPC)",
+  "c": [
+   "Tápellátási vagy testhiba",
+   "CAN-vezetékezési hiba"
+  ]
+ }
+}

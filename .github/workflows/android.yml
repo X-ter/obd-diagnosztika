@@ -1,0 +1,76 @@
+name: Android build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Forráskód letöltése
+        uses: actions/checkout@v4
+
+      - name: JDK 17 telepítése
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Android SDK telepítése
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platforms;android-35 build-tools;35.0.0 platform-tools'
+
+      - name: Gradle beállítása
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Automatikus tesztek (OBD-mag és alkalmazáslogika)
+        run: ./gradlew --no-daemon --stacktrace :core:obd:test :app:testDebugUnitTest
+
+      - name: Debug APK fordítása
+        run: ./gradlew --no-daemon --stacktrace :app:assembleDebug
+
+      - name: APK átnevezése
+        run: |
+          mkdir -p dist
+          cp app/build/outputs/apk/debug/app-debug.apk dist/obd-diagnosztika-debug.apk
+          ls -la dist
+
+      - name: APK feltöltése (Actions artifact)
+        uses: actions/upload-artifact@v4
+        with:
+          name: obd-diagnosztika-debug-apk
+          path: dist/obd-diagnosztika-debug.apk
+          if-no-files-found: error
+
+      - name: Tesztjelentések feltöltése
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: |
+            core/obd/build/reports/tests/
+            app/build/reports/tests/
+          if-no-files-found: ignore
+
+      - name: Közvetlen letöltési link frissítése (GitHub Release "latest")
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release delete latest --yes --cleanup-tag || true
+          gh release create latest dist/obd-diagnosztika-debug.apk \
+            --title "OBD Diagnosztika – legfrissebb debug build (#${{ github.run_number }})" \
+            --notes "Automatikusan fordított debug APK a(z) ${GITHUB_SHA::7} commitból. Telepítés: töltsd le a telefonra, és engedélyezd az ismeretlen forrásból származó alkalmazások telepítését." \
+            --prerelease --target "$GITHUB_SHA"
