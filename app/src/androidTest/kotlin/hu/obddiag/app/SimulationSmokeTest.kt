@@ -138,8 +138,8 @@ class SimulationSmokeTest {
         clickText("Megértettem")
         clickText("ATI")
         waitText("ELM327 v1.5")
-        clickText("03")
-        waitText("43 02")
+        clickText("0100")
+        waitText("41 00")
         shot("13_terminal")
         rule.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
 

@@ -145,7 +145,8 @@ fun HomeScreen(nav: NavController) {
     val voltage by vm.voltage.collectAsStateWithLifecycle()
     val readiness by vm.readiness.collectAsStateWithLifecycle()
     val lastScan by vm.lastScan.collectAsStateWithLifecycle()
-    LaunchedEffect(Unit) { vm.refreshLoop() }
+    // Kapcsolódáskor azonnal frissít, utána 5 másodpercenként, amíg a képernyő látható
+    LaunchedEffect(state.isAdapterConnected, state.isVehicleConnected) { vm.refreshLoop() }
 
     LazyColumn(
         Modifier.fillMaxSize(),
