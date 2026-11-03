@@ -32,6 +32,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavController
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -97,7 +98,7 @@ inline fun <reified VM : ViewModel> appViewModel(key: String? = null, crossinlin
 @Composable
 fun appContainer(): AppContainer = (LocalContext.current.applicationContext as ObdApp).container
 
-fun NavHostController.navigateTab(route: String) {
+fun NavController.navigateTab(route: String) {
     navigate(route) {
         popUpTo(graph.findStartDestination().id) { saveState = true }
         launchSingleTop = true

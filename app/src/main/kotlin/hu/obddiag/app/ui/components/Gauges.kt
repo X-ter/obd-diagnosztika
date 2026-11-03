@@ -119,8 +119,9 @@ fun AnalogGauge(m: GaugeModel, modifier: Modifier = Modifier) {
             }
             drawCircle(accent, radius = stroke * 0.45f, center = c)
         }
+        val wide = maxWidth > 220.dp
         Column(Modifier.align(Alignment.BottomCenter).padding(bottom = 6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(m.valueText, style = if (maxWidth > 220.dp) ValueText.large else ValueText.medium, color = MaterialTheme.colorScheme.onSurface)
+            Text(m.valueText, style = if (wide) ValueText.large else ValueText.medium, color = MaterialTheme.colorScheme.onSurface)
             Text("${m.unit}  ·  ${m.title}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }

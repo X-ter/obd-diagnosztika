@@ -230,7 +230,7 @@ fun DtcScreen(nav: NavController) {
                     }
                     items(list, key = { "${it.code}-${it.status}-${it.ecu}" }) { d -> DtcCard(d, vm.info(d)) }
                     if (s.notSupported.isNotEmpty()) item {
-                        Text(stringResource(R.string.dtc_not_supported, s.notSupported.joinToString { statusName(it) }),
+                        Text(stringResource(R.string.dtc_not_supported, s.notSupported.map { statusName(it) }.joinToString()),
                             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     if (s.stored.isNotEmpty()) item {
