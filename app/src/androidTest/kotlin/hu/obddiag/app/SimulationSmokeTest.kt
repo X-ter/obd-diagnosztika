@@ -155,6 +155,9 @@ class SimulationSmokeTest {
         waitText("Bruttó motor olajnyomás")
         shot("10d_mfr_live")
         rule.onNodeWithTag("tab_more").performClick()
+        // a Továbbiak fül a legutóbb megnyitott alképernyőt (gyártói diagnosztika) állítja vissza
+        waitText("Gyártói diagnosztika – Peugeot")
+        rule.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
 
         clickText("Adatnaplózás")
         clickText("Rögzítés indítása")
