@@ -281,15 +281,17 @@ private fun LiveRow(item: LiveItem, value: LiveValue?, state: String?, health: P
                     Spacer(Modifier.width(8.dp))
                     healthPill(health, value, monitored)
                 }
+                if (item.isState) {
+                    Text(state?.let { stateLabel(it) } ?: "—", style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 2.dp))
+                }
                 if (value != null && monitored && !item.isState) {
                     val mn = formatSignal(item.id, value.min, settings.units); val mx = formatSignal(item.id, value.max, settings.units)
                     Text("min ${mn.text}  ·  max ${mx.text}", style = ValueText.mono, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
-            Column(horizontalAlignment = Alignment.End) {
-                if (item.isState) {
-                    Text(state?.let { stateLabel(it) } ?: "—", style = MaterialTheme.typography.bodyMedium, maxLines = 2)
-                } else {
+            if (!item.isState) Column(horizontalAlignment = Alignment.End) {
+                run {
                     val f = formatSignal(item.id, if (monitored) value?.value else null, settings.units)
                     Row(verticalAlignment = Alignment.Bottom) {
                         Text(f.text, style = ValueText.medium)
