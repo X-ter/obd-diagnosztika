@@ -50,7 +50,7 @@ fun interface TransportFactory {
  */
 class ConnectionManager(
     private val scope: CoroutineScope,
-    val commLog: CommLog = CommLog()
+    val commLog: CommLog = CommLog(capacity = 3000)
 ) {
     private val _state = MutableStateFlow<ConnectionState>(ConnectionState.Disconnected)
     val state: StateFlow<ConnectionState> = _state.asStateFlow()

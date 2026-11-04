@@ -79,8 +79,8 @@ class MfrTest {
 
     // ───── A valódi, konvertált Peugeot-adatbázis ─────
     private fun realDb(): MfrDatabase {
-        val f = listOf("app/src/main/assets/mfr/psa_peugeot.dat", "../../app/src/main/assets/mfr/psa_peugeot.dat",
-            "/home/claude/repo/app/src/main/assets/mfr/psa_peugeot.dat").map(::File).first { it.exists() }
+        val f = listOf("app/src/main/assets/mfr/psa.dat", "../../app/src/main/assets/mfr/psa.dat",
+            "/home/claude/repo/app/src/main/assets/mfr/psa.dat").map(::File).first { it.exists() }
         return MfrDatabase.fromJson(GZIPInputStream(f.inputStream()).bufferedReader().readText())
     }
 
@@ -267,5 +267,46 @@ class MfrTest {
         val raw = c.sendRawExclusive("0100")
         job.join()
         assertTrue("válasz: $raw", raw.contains("7E8") && raw.contains("41 00"))
+    }
+
+    @Test
+    fun kwpSessionIsStartedAfterUdsProbeOnSameAddress() = runBlocking {
+        val db = realDb()
+        val kwp = db.ecus.first { it.key == "AEE2001.full/CMM/EDC16C3DV4" }
+        val uds = db.ecus.first { it.key == "AEE2010.ev/CMM/CMM_MG1CS042" }
+        // ugyanaz a cím (6A8/688), előbb UDS-modell, utána KWP-modell
+        val mixed = MfrDatabase(db.source, db.brand, listOf(uds, kwp).sortedBy { if (it === uds) 0 else 1 }, emptyMap())
+        val ident = listOf(0x61, 0xFE) + List(21) { 0 } + listOf(0x54, 0x98, 0x53)
+        var sessionOpen = false
+        val sent = mutableListOf<String>()
+        val t = object : hu.obddiag.core.transport.ObdTransport {
+            override val type = hu.obddiag.core.transport.TransportType.WIFI
+            override val description = "kwp"
+            override var isConnected = false
+            private val ch = kotlinx.coroutines.channels.Channel<ByteArray>(kotlinx.coroutines.channels.Channel.UNLIMITED)
+            override val input: kotlinx.coroutines.channels.ReceiveChannel<ByteArray> get() = ch
+            override suspend fun connect() { isConnected = true }
+            override suspend fun close() { isConnected = false }
+            override suspend fun write(data: ByteArray) {
+                val cmd = String(data).trim(); sent += cmd
+                val a = when {
+                    cmd == "0100" -> "7E8 06 41 00 BE 3F A8 13"
+                    cmd == "ATDPN" -> "A6"
+                    cmd.startsWith("AT") -> "OK"
+                    cmd == "81" -> { sessionOpen = true; "688 03 C1 EF 8F" }
+                    cmd.startsWith("22") -> "688 03 7F 22 11"
+                    // a PSA KWP-vezérlő session nélkül elutasítja az olvasást
+                    cmd == "21FE" -> if (sessionOpen) isoTp("688", ident) else "688 03 7F 21 80"
+                    else -> "NO DATA"
+                }
+                ch.trySend("$a\r\r>".toByteArray())
+            }
+        }
+        t.connect()
+        val c = ObdClient(ElmSession(t)).apply { connectVehicle() }
+        val res = MfrIdentifier(mixed, MfrSession(c)).identify()
+        assertEquals("549853", res.identified.single().partNumber)
+        assertTrue(sent.indexOf("81") in 0 until sent.indexOf("21FE"))
+        assertTrue(res.trace.any { it.contains("21FE: OK") })
     }
 }

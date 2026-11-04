@@ -144,7 +144,9 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("root")
     ap.add_argument("out")
-    ap.add_argument("--brand", default="peugeot")
+    # "all": minden PSA-vezérlőmodell (az azonosítás pontos cikkszám-egyezésen alapul, így ez biztonságos;
+    # a PSA-RE autólistái hiányosak, egy Peugeot-ban is lehet olyan vezérlő, amelyet csak Citroënnél sorol fel)
+    ap.add_argument("--brand", default="all")
     ap.add_argument("--report")
     a = ap.parse_args()
     root = a.root
@@ -165,7 +167,7 @@ def main():
             continue
         y = yaml.safe_load(open(ecu_file, encoding="utf-8")) or {}
         cars = {str(c) for c in (y.get("cars") or [])}
-        if not (cars & brand_cars):
+        if a.brand != "all" and not (cars & brand_cars):
             skipped["más márka"] += 1
             continue
         addr = None
@@ -239,7 +241,7 @@ def main():
         e = {
             "key": key, "node": y.get("node"), "model": y.get("model", y.get("node")),
             "proto": proto, "rq": addr["request_id"], "rs": addr["response_id"],
-            "ident": ident, "variants": variants, "cars": sorted(cars & brand_cars), "data": data,
+            "ident": ident, "variants": variants, "cars": sorted(cars), "data": data,
         }
         dn = text(y.get("display_name"))
         if dn:

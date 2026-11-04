@@ -323,6 +323,7 @@
     <string name="mfr_summary">%1$d vezérlő azonosítva · %2$d válaszolt · %3$d cím ellenőrizve</string>
     <string name="mfr_live_hint">%1$d gyártói élő érték érhető el. Az Élő adatok képernyőn a „Gyártói (PSA)” kategóriában kapcsold be, amelyiket figyelni szeretnéd.</string>
     <string name="mfr_open_live">Élő adatok megnyitása</string>
+    <string name="mfr_share_report">Azonosítási jelentés megosztása</string>
     <string name="mfr_none_title">Nem válaszolt vezérlő</string>
     <string name="mfr_none_message">Egyetlen ismert PSA-címen sem jött válasz. Lehet, hogy az autó nem PSA-alapú, vagy az adapter nem éri el a belső buszt.</string>
     <string name="mfr_identified">Azonosítva</string>

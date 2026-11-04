@@ -31,7 +31,8 @@ class MfrSafetyException(message: String) : Exception(message)
 class MfrSession(private val client: ObdClient, private val log: CommLog? = null, private val clock: () -> Long = System::currentTimeMillis) {
 
     private var selected: MfrEcu? = null
-    private val lastActivity = HashMap<Int, Long>()
+    /** Címenként az utolsó KWP-forgalom ideje (a PSA KWP-session kb. 5 s tétlenség után lezárul). */
+    private val kwpActivity = HashMap<Int, Long>()
 
     /** Az adapter elfogadta-e az egyedi flow control beállítást (több keretes válaszokhoz szükséges). */
     var flowControlSupported: Boolean = true
@@ -54,8 +55,13 @@ class MfrSession(private val client: ObdClient, private val log: CommLog? = null
         return client.session.at(cmd)
     }
 
-    suspend fun select(ecu: MfrEcu) {
-        val now = clock()
+    /**
+     * A vezérlő kiválasztása (fejléc, válaszszűrő, flow control). KWP-vezérlőnél kommunikációs sessiont is nyit,
+     * ha az utolsó KWP-forgalom óta több mint [KWP_SESSION_REFRESH_MS] telt el (vagy [forceSession]).
+     * A session-időzítés címenként és csak a KWP-forgalomra vonatkozik: egy ugyanarra a címre küldött UDS-kérés
+     * nem tartja életben a KWP-sessiont.
+     */
+    suspend fun select(ecu: MfrEcu, forceSession: Boolean = false) {
         if (selected?.requestId != ecu.requestId || selected?.responseId != ecu.responseId) {
             at("ATSH%03X".format(ecu.requestId))
             at("ATCRA%03X".format(ecu.responseId))
@@ -65,14 +71,12 @@ class MfrSession(private val client: ObdClient, private val log: CommLog? = null
                 at("ATFCSD300000")
                 at("ATFCSM1")
             }
-            lastActivity.remove(ecu.requestId)
         }
         selected = ecu
-        // A PSA KWP-vezérlők olvasás előtt kommunikációs sessiont várnak; ~5 s tétlenség után ez lezárul.
-        if (ecu.protocol == MfrProtocol.KWP_PSA && now - (lastActivity[ecu.requestId] ?: 0L) > KWP_SESSION_REFRESH_MS) {
+        if (ecu.protocol == MfrProtocol.KWP_PSA &&
+            (forceSession || clock() - (kwpActivity[ecu.requestId] ?: 0L) > KWP_SESSION_REFRESH_MS)) {
             send(ecu, if (ecu.isPowertrain) "81" else "10C0")
         }
-        lastActivity[ecu.requestId] = now
     }
 
     /**
@@ -98,8 +102,9 @@ class MfrSession(private val client: ObdClient, private val log: CommLog? = null
             throw MfrSafetyException("Nem engedélyezett diagnosztikai kérés: $cmd")
         }
         check(selected?.requestId == ecu.requestId && selected?.responseId == ecu.responseId) { "A vezérlő nincs kiválasztva" }
-        lastActivity[ecu.requestId] = clock()
-        return client.session.obd(cmd, timeoutMs)
+        val res = client.session.obd(cmd, timeoutMs)
+        if (ecu.protocol == MfrProtocol.KWP_PSA) kwpActivity[ecu.requestId] = clock()
+        return res
     }
 
     /** Egy azonosító olvasása; csak a vezérlő válaszcíméről érkező pozitív választ fogadja el. */

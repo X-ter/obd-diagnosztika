@@ -194,7 +194,7 @@ UI.update({
 "mfr_no_flow_control_detail": "A több keretes (hosszabb) válaszok nem olvashatók ezzel az adapterrel; ajánlott egy valódi ELM327 v1.4b+ vagy OBDLink adapter.",
 "mfr_summary": "%1$d vezérlő azonosítva · %2$d válaszolt · %3$d cím ellenőrizve",
 "mfr_live_hint": "%1$d gyártói élő érték érhető el. Az Élő adatok képernyőn a „Gyártói (PSA)” kategóriában kapcsold be, amelyiket figyelni szeretnéd.",
-"mfr_open_live": "Élő adatok megnyitása",
+"mfr_open_live": "Élő adatok megnyitása", "mfr_share_report": "Azonosítási jelentés megosztása",
 "mfr_none_title": "Nem válaszolt vezérlő", "mfr_none_message": "Egyetlen ismert PSA-címen sem jött válasz. Lehet, hogy az autó nem PSA-alapú, vagy az adapter nem éri el a belső buszt.",
 "mfr_identified": "Azonosítva", "mfr_ambiguous": "Nem egyértelmű", "mfr_unknown": "Ismeretlen cikkszám",
 "mfr_model": "Vezérlőmodell", "mfr_variant": "Szoftverváltozat", "mfr_part": "Cikkszám", "mfr_protocol": "Protokoll",

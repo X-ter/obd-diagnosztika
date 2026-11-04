@@ -24,6 +24,7 @@ import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.HelpOutline
 import androidx.compose.material.icons.outlined.Memory
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.ShowChart
 import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.Button
@@ -86,6 +87,33 @@ class MfrViewModel(val c: AppContainer) : ViewModel() {
         private set
 
     fun identify() = viewModelScope.launch { c.mfr.identify() }
+
+    /** Megosztható azonosítási jelentés: címenként a nyers válaszok és a kiolvasott cikkszámok. */
+    fun report(r: hu.obddiag.core.mfr.MfrIdentification): String = buildString {
+        val conn = c.connection.state.value as? ConnectionState.Connected
+        append("OBD Diagnosztika ").append(hu.obddiag.app.BuildConfig.VERSION_NAME).append(" – gyártói azonosítási jelentés\n")
+        append("Idő: ").append(java.time.Instant.now()).append('\n')
+        c.connection.mfr.value?.source?.let { append("Adatbázis: ").append(it.name).append(' ').append(it.commit.take(8)).append('\n') }
+        conn?.let {
+            append("Adapter: ").append(it.adapter.elmVersion).append(it.adapter.stnVersion?.let { s -> " / $s" } ?: "")
+            append(" | Protokoll: ").append(it.vehicle.protocol.displayName).append(" | ECU-k: ").append(it.vehicle.ecus.joinToString()).append('\n')
+            if (it.simulated) append("SZIMULÁLT KAPCSOLAT\n")
+        }
+        append("Flow control: ").append(if (r.flowControlSupported) "OK" else "NEM támogatott").append('\n')
+        r.error?.let { append("Hiba: ").append(it).append('\n') }
+        append("\n== Eredmény ==\n")
+        for (d in r.detections) {
+            append("%03X→%03X ".format(d.requestId, d.responseId))
+            when (d) {
+                is MfrDetection.Identified -> append("AZONOSÍTVA ${d.ecu.key} változat=${d.variant} cikkszám=${d.partNumber}")
+                is MfrDetection.Ambiguous -> append("NEM EGYÉRTELMŰ cikkszám=${d.partNumber} jelöltek=${d.candidates.joinToString()}")
+                is MfrDetection.Unknown -> append("ISMERETLEN cikkszám(ok)=${d.partNumbers.joinToString().ifEmpty { "–" }} (${d.nodes.joinToString()})")
+            }
+            append('\n')
+        }
+        append("\n== Részletek (").append(r.probedAddresses).append(" cím) ==\n")
+        r.trace.forEach { append(it).append('\n') }
+    }
 
     fun readStatic(det: MfrDetection.Identified, onUnsupported: String) {
         if (staticLoading != null) return
@@ -167,6 +195,17 @@ fun MfrScreen(nav: NavController) {
                     item {
                         AppCard {
                             Text(stringResource(R.string.mfr_summary, r.identified.size, r.detections.size, r.probedAddresses), style = MaterialTheme.typography.titleSmall)
+                            val context = LocalContext.current
+                            val scope = androidx.compose.runtime.rememberCoroutineScope()
+                            Spacer(Modifier.height(8.dp))
+                            OutlinedButton(onClick = {
+                                scope.launch {
+                                    hu.obddiag.app.data.CsvExporter.share(context, "gyartoi_azonositas_${hu.obddiag.app.data.CsvExporter.fileStamp()}.txt",
+                                        vm.report(r), "text/plain", context.getString(R.string.share))
+                                }
+                            }, modifier = Modifier.fillMaxWidth()) {
+                                Icon(Icons.Outlined.Share, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.mfr_share_report))
+                            }
                             val live = registry?.signals?.count { it.isLive } ?: 0
                             if (live > 0) {
                                 Spacer(Modifier.height(8.dp))

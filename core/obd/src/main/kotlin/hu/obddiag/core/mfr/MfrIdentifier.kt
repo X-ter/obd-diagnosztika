@@ -25,7 +25,9 @@ data class MfrIdentification(
     val detections: List<MfrDetection>,
     val probedAddresses: Int,
     val flowControlSupported: Boolean,
-    val error: String? = null
+    val error: String? = null,
+    /** Részletes napló: címenként a küldött azonosító kérések és a válaszok (hibakereséshez, megosztható). */
+    val trace: List<String> = emptyList()
 ) {
     val identified: List<MfrDetection.Identified> get() = detections.filterIsInstance<MfrDetection.Identified>()
 }
@@ -36,11 +38,16 @@ data class MfrIdentification(
  */
 class MfrIdentifier(private val db: MfrDatabase, private val session: MfrSession) {
 
+    private val trace = mutableListOf<String>()
+
+    private fun hex(b: ByteArray) = b.joinToString(" ") { "%02X".format(it.toInt() and 0xFF) }
+
     suspend fun identify(onProgress: (done: Int, total: Int) -> Unit = { _, _ -> }): MfrIdentification {
         if (!session.protocolSupported) {
             return MfrIdentification(emptyList(), 0, true, "A gyártói diagnosztika 11 bites CAN protokollt igényel (a jármű protokollja ettől eltér).")
         }
         val detections = mutableListOf<MfrDetection>()
+        trace.clear()
         val addresses = db.addresses.entries.groupBy({ it.key.first to it.key.second }, { it.value }).entries.toList()
         var done = 0
         for ((addr, ecuLists) in addresses) {
@@ -55,7 +62,7 @@ class MfrIdentifier(private val db: MfrDatabase, private val session: MfrSession
             }
             onProgress(++done, addresses.size)
         }
-        return MfrIdentification(detections, addresses.size, session.flowControlSupported)
+        return MfrIdentification(detections, addresses.size, session.flowControlSupported, trace = trace.toList())
     }
 
     private suspend fun detect(rq: Int, rs: Int, ecus: List<MfrEcu>): MfrDetection? = session.exclusive {
@@ -65,9 +72,18 @@ class MfrIdentifier(private val db: MfrDatabase, private val session: MfrSession
         var anyAnswer = false
         // Protokollonként (UDS / KWP) és azonosító kérésenként egyszer kérdezünk.
         for ((proto, byProto) in ecus.groupBy { it.protocol }) {
+            var first = true
             for ((req, group) in byProto.groupBy { it.ident.request }) {
-                select(group.first())
+                // protokollváltáskor (UDS → KWP ugyanazon a címen) mindig új KWP-session kell
+                select(group.first(), forceSession = first)
+                first = false
                 val r = read(group.first(), req)
+                trace += "%03X→%03X %s %s: %s".format(rq, rs, if (proto == MfrProtocol.UDS) "UDS" else "KWP", req, when (r) {
+                    is MfrReadResult.Ok -> "OK " + hex(r.payload)
+                    is MfrReadResult.Negative -> "NRC 0x%02X".format(r.nrc)
+                    MfrReadResult.NoResponse -> "nincs válasz"
+                    is MfrReadResult.Failed -> "hiba: " + r.reason
+                })
                 if (r is MfrReadResult.NoResponse && !anyAnswer) continue
                 if (r !is MfrReadResult.Ok) { if (r is MfrReadResult.Negative) anyAnswer = true; continue }
                 anyAnswer = true
@@ -82,6 +98,8 @@ class MfrIdentifier(private val db: MfrDatabase, private val session: MfrSession
             }
             if (proto == MfrProtocol.UDS && anyAnswer && matches.isNotEmpty()) break
         }
+        if (anyAnswer) trace += "%03X: kiolvasott cikkszámok: %s; egyezés: %s".format(rq, parts.distinct().joinToString().ifEmpty { "–" },
+            matches.joinToString { "${it.first.key} (${it.second.ifEmpty { "nem egyértelmű" }})" }.ifEmpty { "nincs" })
         when {
             !anyAnswer -> null
             matches.size == 1 && matches[0].second.isNotEmpty() ->

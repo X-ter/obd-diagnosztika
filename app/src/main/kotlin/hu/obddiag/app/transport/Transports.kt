@@ -70,15 +70,32 @@ abstract class StreamTransport : ObdTransport {
         }
     }
 
+    /** A kapcsolat azonnali lezárása (az elakadt, blokkoló írás feloldásához). */
+    protected abstract fun forceClose()
+
     override suspend fun write(data: ByteArray) = withContext(Dispatchers.IO) {
         val out = output ?: throw TransportException("Nincs kapcsolat")
+        // Írás-őr: ha a Bluetooth/Wi-Fi kapcsolat elakad, a blokkoló írás akár 30 s-ig is tarthat.
+        // Ilyenkor lezárjuk a kapcsolatot, így az automatikus újracsatlakozás azonnal elindulhat.
+        val watchdog = java.util.Timer("write-watchdog", true)
+        var timedOut = false
+        watchdog.schedule(object : java.util.TimerTask() {
+            override fun run() { timedOut = true; open = false; try { forceClose() } catch (_: Exception) { } }
+        }, WRITE_TIMEOUT_MS)
         try {
             out.write(data)
             out.flush()
         } catch (e: Exception) {
             open = false
-            throw TransportException("Írási hiba: ${e.message}", e)
+            throw TransportException(if (timedOut) "Az adapter nem fogadja az adatot (írási időtúllépés)" else "Írási hiba: ${e.message}", e)
+        } finally {
+            watchdog.cancel()
         }
+        if (timedOut) throw TransportException("Az adapter nem fogadja az adatot (írási időtúllépés)")
+    }
+
+    companion object {
+        const val WRITE_TIMEOUT_MS = 4_000L
     }
 }
 
@@ -125,6 +142,8 @@ class BluetoothClassicTransport(private val context: Context, private val addres
             last
         )
     }
+
+    override fun forceClose() { socket?.close() }
 
     override suspend fun close() = withContext(Dispatchers.IO) {
         open = false
@@ -174,6 +193,8 @@ class WifiTransport(private val context: Context, private val host: String, priv
         output = s.getOutputStream()
         startReader(s.getInputStream(), "wifi-reader")
     }
+
+    override fun forceClose() { socket?.close() }
 
     override suspend fun close() = withContext(Dispatchers.IO) {
         open = false

@@ -1,17 +1,16 @@
 # PSA-RE konverziós riport
 
-PSA-RE 67f7581e | márka: peugeot | ECU-modellek: 347 | azonosítók: 13433 (élő: 8828) | paraméterek: 38361 | nem egyértelmű cikkszám: 129 | méret: 18.4 MB → 2.48 MB (gzip)
+PSA-RE 67f7581e | márka: all | ECU-modellek: 380 | azonosítók: 13798 (élő: 8986) | paraméterek: 39966 | nem egyértelmű cikkszám: 136 | méret: 18.8 MB → 2.54 MB (gzip)
 
 ## Kihagyva
 
-- speciális azonosító fájl: 130
-- nem olvasható: 115
-- mapped (táblázatos) – még nem támogatott: 98
-- paraméter nélküli azonosító: 89
+- paraméter nélküli azonosító: 138
+- speciális azonosító fájl: 134
+- nem olvasható: 118
+- mapped (táblázatos) – még nem támogatott: 99
 - nincs olvasható adat: 44
-- más márka: 37
-- nincs azonosítás / cikkszám: 33
-- nem CAN / nem UDS-KWP: 25
+- nincs azonosítás / cikkszám: 34
+- nem CAN / nem UDS-KWP: 28
 
 ## Hibás definíciók (4) – nem kerültek be
 
@@ -20,7 +19,7 @@ PSA-RE 67f7581e | márka: peugeot | ECU-modellek: 347 | azonosítók: 13433 (él
 - AEE2010.ev/TO1/TO/dids/F18C.yml/PART_SERIAL_NUMBER: értelmezhetetlen bitpozíció '1.7-n'
 - AEE2010.ev/TO1/TO_DTC/dids/F18C.yml/PART_SERIAL_NUMBER: értelmezhetetlen bitpozíció '1.7-n'
 
-## Nem egyértelmű cikkszámok (129)
+## Nem egyértelmű cikkszámok (136)
 
 Ezeknél az app nem választ modellt automatikusan.
 
@@ -133,9 +132,12 @@ Ezeknél az app nem választ modellt automatikusan.
 - 0x733 22F080 9810486880: AEE2010.ev/BRNC/BRNC_AVD, AEE2010.ev/BRNC/BRNC_AVG
 - 0x733 22F080 9811343780: AEE2010.ev/SPB/SPB_D, AEE2010.ev/SPB/SPB_P
 - 0x733 22F080 9811343880: AEE2010.ev/SPB/SPB_D, AEE2010.ev/SPB/SPB_P
+- 0x752 2180 9642825280: AEE2004.full/BSI/BSI, AEE2004.full/BSI/BSI_KILO
+- 0x752 2180 9657999680: AEE2004.full/BSI/BSI, AEE2004.full/BSI/BSI_KILO
 - 0x752 218D 0000000000: AEE2004.full/BSG/BTC, AEE2004.full/BSR/BSR
 - 0x752 218D 9662007580: AEE2004.full/BSG/BTC, AEE2004.full/BSR/BSR
 - 0x752 218D 9665989680: AEE2004.full/BSG/BTC, AEE2004.full/BSR/BSR
+- 0x752 22F080 9674980880: AEE2010.full/BSI/BSI2010, AEE2010.full/BSI/BSI_UDS_PSA
 - 0x760 2180 9666660977: AEE2001.full/RAD/RDE, AEE2004.full/RAD/RADIO, AEE2010.eco/RAD/RADIO_RDE
 - 0x760 2180 9666661077: AEE2001.full/RAD/RDE, AEE2004.full/RAD/RADIO, AEE2010.eco/RAD/RADIO_RDE
 - 0x760 2180 9674837077: AEE2001.full/RAD/RDE, AEE2004.full/RAD/RADIO, AEE2010.eco/RAD/RADIO_RDE
@@ -146,10 +148,14 @@ Ezeknél az app nem választ modellt automatikusan.
 - 0x760 2180 9804162677: AEE2004.ev/RAD/RD45, AEE2004.full/RAD/RADIO
 - 0x760 2180 9804916477: AEE2001.full/RAD/RDE, AEE2004.full/RAD/RADIO, AEE2010.eco/RAD/RADIO_RDE
 - 0x760 2180 9805102677: AEE2001.full/RAD/RDE, AEE2004.full/RAD/RADIO, AEE2010.eco/RAD/RADIO_RDE
+- 0x764 22F080 00002853: AEE2010.ev/BTA/INC, AEE2010.ev/BTEL/NAC
 - 0x765 2180 9676656080: AEE2004.full/EMF/EMF_A, AEE2004.full/EMF/EMF_C
 - 0x765 2180 9807307080: AEE2004.full/EMF/EMF_A, AEE2004.full/EMF/EMF_C
 - 0x77C 21FE 930319: AEE2010.ev/BTA/BTA_CN, AEE2010.full/BTA/BTA_2
 - 0x77C 21FE 930808: AEE2010.ev/BTA/BTA_CN, AEE2010.full/BTA/BTA_2
 - 0x780 22F189 9999999999999999: AEE2010.full/ABS/ABS_KP1, AEE2010.full/ABS/ESP_KP1
+- 0x782 1A87 3831303042343436: MMC.full/CMB/METER, MMC.full/CMB/METER_CAN_MMC_2
+- 0x7B0 1A80 3283A485B3: FIAT.full/CMB/CLUSTER_CAN_FIAT, FIAT.full/CMB/CLUSTER_CAN_FIAT_2
 - 0x18DA10F1 22F1A0 4583010725: FIAT.full/CMM/V342, FIAT.full/CMM/V34P
 - 0x18DA10F1 22F1A0 45830208A7: FIAT.full/CMM/V342, FIAT.full/CMM/V34P
+- 0x18DA60F1 22F1A0 3283528AE6: FIAT.full/CMB/IPC, FIAT.full/CMB/IPC_UDS_FIAT_2

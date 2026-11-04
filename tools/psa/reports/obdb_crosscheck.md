@@ -3,9 +3,9 @@
 Az OBDb autótípusonként egy skálát ad, a PSA-RE vezérlőmodellenként. Ahol a táblázat eltérést mutat, ott az OBDb-érték csak bizonyos motorvezérlőkön lenne helyes – ezért az app a PSA-RE vezérlőmodell-szintű adatait használja, azonosított vezérlő esetén.
 
 - minden modellel egyezik: 2385
-- nincs a PSA-RE-ben: 825
+- nincs a PSA-RE-ben: 824
 - csak egyes modellekkel egyezik: 695
-- más bitpozíció: 520
+- más bitpozíció: 521
 - egyik modellel sem egyezik: 104
 
 | OBDb modell | Cím | Kérés | Jel | OBDb skála | Eltérő PSA-RE vezérlőmodellek |
