@@ -21,6 +21,7 @@ import hu.obddiag.core.pid.ObdUnit
 import hu.obddiag.core.pid.StandardPids
 import hu.obddiag.core.poll.PidHealth
 import hu.obddiag.core.sim.SimulatedElm327
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -232,5 +233,22 @@ class MfrTest {
         assertEquals(138 * 0.1004, r.samples.single { it.signalId == "mfr.6A8.21C7.BATTERY_VOLTAGE" }.value, 1e-6)
         // a végén visszaállt a szabványos címzés
         assertEquals("ATSH7DF", t.sent.last { it.startsWith("ATSH") })
+    }
+
+    @Test
+    fun cancelledManufacturerCycleStillRestoresObdAddressing() = runBlocking {
+        val sim = SimulatedElm327(responseDelayMs = 15)
+        val c = simClient(sim)
+        val db = realDb()
+        val session = MfrSession(c)
+        val ident = MfrIdentifier(MfrDatabase(db.source, db.brand, db.ecus.filter { it.requestId == 0x6A8 }, emptyMap()), session).identify()
+        val reg = MfrRegistry(ident, db.source)
+        val ids = reg.signals.filter { it.isLive }.take(20).map { it.id }.toSet()
+        // A kör közepén megszakítjuk (mint amikor a terminál szünetelteti a lekérdezést)
+        val job = kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.Default) { MfrPoller(reg, session).cycle(ids) }
+        kotlinx.coroutines.delay(200)
+        job.cancel(); job.join()
+        val r = c.readPids(listOf(0x0C)) as ElmResult.Data
+        assertEquals("7E8", r.messages.single().ecu)
     }
 }

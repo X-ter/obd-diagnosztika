@@ -75,14 +75,18 @@ class MfrSession(private val client: ObdClient, private val log: CommLog? = null
         lastActivity[ecu.requestId] = now
     }
 
+    /**
+     * A szabványos OBD-címzés visszaállítása. Megszakíthatatlan: ha a lekérdezést éppen egy gyártói olvasás
+     * közben állítják le (pl. a szakértői terminál megnyitásakor), a címzésnek akkor is vissza kell állnia,
+     * különben a következő szabványos kérés a gyártói címre menne.
+     */
     suspend fun restoreObd() {
         if (selected == null) return
         selected = null
-        try {
-            client.session.at("ATFCSM0")
-            client.session.at("ATCRA")
-            client.session.at("ATSH7DF")
-        } catch (_: Exception) {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+            for (cmd in listOf("ATFCSM0", "ATCRA", "ATSH7DF")) {
+                try { client.session.at(cmd) } catch (_: Exception) { }
+            }
         }
     }
 
