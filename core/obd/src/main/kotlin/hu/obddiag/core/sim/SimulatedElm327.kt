@@ -48,7 +48,8 @@ class SimulatedElm327(
 
     private val supported = setOf(
         0x01, 0x03, 0x04, 0x05, 0x06, 0x07, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x13, 0x15, 0x1C, 0x1F,
-        0x20, 0x21, 0x2F, 0x30, 0x31, 0x33, 0x3C, 0x40, 0x42, 0x43, 0x44, 0x45, 0x46, 0x49, 0x4C, 0x51, 0x5C
+        0x20, 0x21, 0x2F, 0x30, 0x31, 0x33, 0x3C, 0x40, 0x42, 0x43, 0x44, 0x45, 0x46, 0x49, 0x4C, 0x51, 0x5C,
+        0x5E, 0x60, 0x61, 0x62, 0x63, 0x67, 0x68, 0x6C, 0x7F, 0x80, 0x8E, 0x9D, 0xA0, 0xA4, 0xA6
     )
 
     override suspend fun connect() {
@@ -208,7 +209,7 @@ class SimulatedElm327(
         fun u16(v: Double): List<Int> { val x = v.roundToInt().coerceIn(0, 65535); return listOf(x shr 8, x and 0xFF) }
         fun pct(v: Double) = (v * 255 / 100).roundToInt().coerceIn(0, 255)
         return when (pid) {
-            0x00, 0x20, 0x40 -> supportMask(pid)
+            0x00, 0x20, 0x40, 0x60, 0x80, 0xA0 -> supportMask(pid)
             0x01 -> listOf((if (milOn) 0x80 else 0) or storedDtcs.size, 0x07, 0x65, 0x04)
             0x03 -> listOf(if (e.coolant < 60) 0x01 else 0x02, 0x00)
             0x04 -> listOf(pct(e.load))
@@ -241,15 +242,36 @@ class SimulatedElm327(
             0x4C -> listOf(pct(e.throttle))
             0x51 -> listOf(0x01)
             0x5C -> listOf((e.coolant * 0.95 + 40).roundToInt())
+            0x5E -> u16(fuelLph(e) * 20)
+            0x61 -> listOf((e.load * 0.95 + 125).roundToInt())
+            0x62 -> listOf((e.load * 0.9 + 125).roundToInt())
+            0x63 -> u16(320.0)
+            0x67 -> listOf(0x01, (e.coolant + 40).roundToInt(), 0x00)
+            0x68 -> listOf(0x01, 24 + 40, 0, 0, 0, 0, 0)
+            0x6C -> listOf(0x03, pct(e.throttle), pct(e.throttle - 0.5))
+                .let { it + listOf(0, 0) }
+            0x7F -> listOf(0x03) + u32(4_512_345L + t().toLong()) + u32(1_204_000L) + u32(0)
+            0x8E -> listOf(125 + 8)
+            0x9D -> u16(fuelLph(e) * 745.0 / 3600.0 / 0.02) + u16(fuelLph(e) * 745.0 / 3600.0 / 0.02)
+            0xA4 -> {
+                val gear = gearFor(e.speed)
+                val ratio = listOf(0.0, 3.6, 2.1, 1.4, 1.0, 0.8, 0.65)[gear]
+                listOf(0x03, gear shl 4) + u16(ratio * 1000)
+            }
+            0xA6 -> u32(1_534_870L + (t() * e.speed / 360.0).toLong())
             else -> null
         }
     }
+
+    private fun u32(v: Long): List<Int> = listOf((v shr 24).toInt() and 0xFF, (v shr 16).toInt() and 0xFF, (v shr 8).toInt() and 0xFF, v.toInt() and 0xFF)
+    private fun fuelLph(e: EngineState) = e.maf * 3600.0 / 14.7 / 745.0
+    private fun gearFor(speed: Double) = when { speed < 2 -> 0; speed < 18 -> 1; speed < 35 -> 2; speed < 55 -> 3; speed < 75 -> 4; speed < 90 -> 5; else -> 6 }
 
     private fun mode01(pids: List<Int>): List<Int>? {
         if (pids.isEmpty()) return null
         val out = mutableListOf(0x41)
         for (p in pids.take(6)) {
-            if (p !in supported && p !in setOf(0x00, 0x20, 0x40)) continue
+            if (p !in supported && p != 0x00) continue
             val d = pidData(p) ?: continue
             out += p
             out += d

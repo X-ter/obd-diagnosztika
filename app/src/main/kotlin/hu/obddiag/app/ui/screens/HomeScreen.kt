@@ -44,6 +44,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.NavController
@@ -146,7 +147,11 @@ fun HomeScreen(nav: NavController) {
     val readiness by vm.readiness.collectAsStateWithLifecycle()
     val lastScan by vm.lastScan.collectAsStateWithLifecycle()
     // Kapcsolódáskor azonnal frissít, utána 5 másodpercenként, amíg a képernyő látható
-    LaunchedEffect(state.isAdapterConnected, state.isVehicleConnected) { vm.refreshLoop() }
+    val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
+    LaunchedEffect(state.isAdapterConnected, state.isVehicleConnected) {
+        // Csak akkor fut, ha a képernyő látható (háttérben nem terheli az adaptert és az akkumulátort)
+        lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) { vm.refreshLoop() }
+    }
 
     LazyColumn(
         Modifier.fillMaxSize(),

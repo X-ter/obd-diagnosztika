@@ -96,6 +96,7 @@ import hu.obddiag.app.ui.theme.AppTheme
 import hu.obddiag.app.ui.theme.ValueText
 import hu.obddiag.core.connection.ConnectionState
 import hu.obddiag.core.pid.PidCategory
+import hu.obddiag.core.pid.DerivedSignals
 import hu.obddiag.core.pid.StandardPids
 import hu.obddiag.core.poll.PidHealth
 import kotlinx.coroutines.delay
@@ -124,9 +125,12 @@ class LiveDataViewModel(private val c: AppContainer) : ViewModel() {
     /** Az ECU által támogatott szabványos jelek. */
     fun available(): List<LiveItem> {
         val supported = c.connection.client.value?.supportedPids ?: return emptyList()
-        return StandardPids.all.filter { it.pid in supported && it.pid !in StandardPids.SUPPORT_PIDS }.flatMap { p ->
+        val standard = StandardPids.all.filter { it.pid in supported && it.pid !in StandardPids.SUPPORT_PIDS }.flatMap { p ->
             p.signals.map { LiveItem(it.id, p.pid, it.category, false) } + p.states.map { LiveItem(it.id, p.pid, it.category, true) }
         }
+        // Számított értékek: nincs saját PID-jük (pid = -1), a bemeneteik alapján jelennek meg
+        val derived = DerivedSignals.available(supported).map { LiveItem(it.id, -1, PidCategory.CALCULATED, false) }
+        return standard + derived
     }
 
     fun initMonitored(items: List<LiveItem>) {
@@ -278,7 +282,8 @@ private fun LiveRow(item: LiveItem, value: LiveValue?, state: String?, health: P
             Column(Modifier.weight(1f)) {
                 Text(signalName(item.id), style = MaterialTheme.typography.bodyLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("PID ${"%02X".format(item.pid)}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(if (item.pid >= 0) "PID ${"%02X".format(item.pid)}" else stringResource(R.string.calculated),
+                        style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.width(8.dp))
                     healthPill(health, value, monitored, item.isState && state != null)
                 }

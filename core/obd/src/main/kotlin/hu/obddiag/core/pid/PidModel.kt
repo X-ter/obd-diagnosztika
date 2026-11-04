@@ -1,13 +1,15 @@
 package hu.obddiag.core.pid
 
 /** Megjelenítési kategória. A fordítást az alkalmazás végzi a kulcs alapján. */
-enum class PidCategory { ENGINE, FUEL, AIR, OXYGEN, EXHAUST, TEMPERATURE, ELECTRICAL, VEHICLE, STATUS, DIESEL }
+enum class PidCategory { ENGINE, FUEL, AIR, OXYGEN, EXHAUST, TEMPERATURE, ELECTRICAL, VEHICLE, TRANSMISSION, STATUS, DIESEL, CALCULATED }
 
 /** Mértékegység (SI alapú); az átváltásról a [hu.obddiag.core.util.UnitConverter] gondoskodik. */
 enum class ObdUnit(val symbol: String) {
     RPM("1/min"), KMH("km/h"), CELSIUS("°C"), PERCENT("%"), KPA("kPa"), PA("Pa"), GRAMS_PER_SEC("g/s"),
     DEGREE("°"), VOLT("V"), MILLIAMP("mA"), SECONDS("s"), MINUTES("min"), KM("km"), RATIO("λ"),
-    LITERS_PER_HOUR("L/h"), NEWTON_METER("Nm"), COUNT(""), NONE("")
+    LITERS_PER_HOUR("L/h"), NEWTON_METER("Nm"), COUNT(""), NONE(""),
+    HOURS("h"), PPM("ppm"), MG_PER_M3("mg/m³"), MG_PER_STROKE("mg/löket"), KG_PER_HOUR("kg/h"),
+    L_PER_100KM("L/100km"), KILOWATT("kW"), HORSEPOWER("LE"), AFR("AFR"), GEAR("")
 }
 
 /**

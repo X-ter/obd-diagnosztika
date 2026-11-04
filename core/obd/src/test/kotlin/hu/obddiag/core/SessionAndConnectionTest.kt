@@ -202,7 +202,7 @@ class SessionAndConnectionTest {
     fun pollerDeliversEveryRequestedPid() = runBlocking {
         val c = connectedSimClient()
         val poller = PidPoller(c)
-        val wanted = setOf(0x04, 0x05, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x2F, 0x33, 0x42, 0x45, 0x46, 0x49, 0x4C, 0x5C)
+        val wanted = setOf(0x04, 0x05, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x2F, 0x33, 0x42, 0x45, 0x46, 0x49, 0x4C, 0x5C, 0x5E, 0x62, 0x63, 0x67, 0x68, 0x6C, 0x7F, 0x8E, 0x9D, 0xA4, 0xA6)
         poller.setRequestedPids(wanted)
         val seen = java.util.Collections.synchronizedSet(mutableSetOf<Int>())
         val collector = launch(Dispatchers.Default) {
@@ -212,5 +212,24 @@ class SessionAndConnectionTest {
         withTimeout(5_000) { while (!seen.containsAll(wanted)) delay(50) }
         job.cancel(); collector.cancel()
         assertTrue(poller.health.value.values.none { it == PidHealth.NOT_SUPPORTED })
+    }
+
+    @Test
+    fun longSinglePidNotTruncatedByCountHint() = runBlocking {
+        val c = connectedSimClient()
+        assertTrue(c.useResponseCountHint)
+        // A 0x7F 13 adatbájtos: több CAN-keretben érkezik
+        val r = c.readPids(listOf(0x7F)) as ElmResult.Data
+        val d = hu.obddiag.core.pid.PidDecoder.decode(r.messages).single()
+        assertNotNull(d.values["01.7F.T"])
+        assertNotNull(d.values["01.7F.I"])
+    }
+
+    @Test
+    fun simulatorDiscoversExtendedRanges() = runBlocking {
+        val c = connectedSimClient()
+        assertTrue(0xA6 in c.supportedPids)
+        assertTrue(0x7F in c.supportedPids)
+        assertEquals(false, c.compressionIgnition)
     }
 }

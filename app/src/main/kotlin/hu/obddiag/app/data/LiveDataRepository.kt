@@ -2,6 +2,7 @@ package hu.obddiag.app.data
 
 import hu.obddiag.core.connection.ConnectionManager
 import hu.obddiag.core.pid.Sample
+import hu.obddiag.core.pid.DerivedSignals
 import hu.obddiag.core.pid.StandardPids
 import hu.obddiag.core.poll.PidHealth
 import hu.obddiag.core.poll.PidPoller
@@ -70,6 +71,8 @@ class LiveDataRepository(
     private val connection: ConnectionManager
 ) {
     private val subscriptions = MutableStateFlow<Map<String, Set<String>>>(emptyMap())
+    /** A szüneteltetés okai (pl. "background", "terminal"); a lekérdezés csak akkor fut, ha nincs ok. */
+    private val pauseReasons = MutableStateFlow<Set<String>>(emptySet())
     private val paused = MutableStateFlow(false)
 
     private val _values = MutableStateFlow<Map<String, LiveValue>>(emptyMap())
@@ -127,7 +130,7 @@ class LiveDataRepository(
     }
 
     private fun updatePolling(poller: PidPoller?, signals: Set<String>, isPaused: Boolean) {
-        val pids = signals.mapNotNull { StandardPids.pidOfSignal(it)?.pid }.toSet()
+        val pids = signals.flatMap { StandardPids.requiredPids(it) }.toSet()
         poller?.setRequestedPids(pids)
         poller?.minCycleIntervalMs = minCycleIntervalMs
         val shouldRun = poller != null && pids.isNotEmpty() && !isPaused
@@ -154,9 +157,22 @@ class LiveDataRepository(
             )
             synchronized(history) { history.getOrPut(s.signalId) { SeriesBuffer(HISTORY_CAPACITY) } }.add(s.timestampMs, s.value)
         }
+        // Számított értékek (teljesítmény, fogyasztás, túlnyomás…) a frissen mért bemenetekből
+        val ts = batch.maxOfOrNull { it.timestampMs } ?: System.currentTimeMillis()
+        val simulated = batch.any { it.simulated }
+        val derived = DerivedSignals.computeAll(
+            cur.mapValues { (_, v) -> v.value to v.timestampMs }, batch.map { it.signalId }.toSet(), ts,
+            connection.client.value?.compressionIgnition
+        ).map { (id, v) -> Sample(id, v, ts, simulated) }
+        for (s in derived) {
+            val prev = cur[s.signalId]
+            cur[s.signalId] = LiveValue(s.signalId, s.value, s.timestampMs,
+                prev?.let { minOf(it.min, s.value) } ?: s.value, prev?.let { maxOf(it.max, s.value) } ?: s.value, s.simulated)
+            synchronized(history) { history.getOrPut(s.signalId) { SeriesBuffer(HISTORY_CAPACITY) } }.add(s.timestampMs, s.value)
+        }
         _values.value = cur
         _tick.value = _tick.value + 1
-        _samples.tryEmit(batch)
+        _samples.tryEmit(if (derived.isEmpty()) batch else batch + derived)
     }
 
     fun history(signalId: String): SeriesBuffer? = synchronized(history) { history[signalId] }
@@ -180,9 +196,10 @@ class LiveDataRepository(
         subscriptions.value = subscriptions.value - owner
     }
 
-    /** Az alkalmazás háttérbe kerülésekor (ha nem fut naplózás) szüneteltetjük a lekérdezést. */
-    fun setPaused(p: Boolean) {
-        paused.value = p
+    /** Szüneteltetés egy adott okból (háttérbe kerülés, szakértői terminál…); minden ok feloldása után folytatódik. */
+    fun setPaused(reason: String, p: Boolean) {
+        pauseReasons.value = if (p) pauseReasons.value + reason else pauseReasons.value - reason
+        paused.value = pauseReasons.value.isNotEmpty()
     }
 
     companion object {

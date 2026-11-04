@@ -14,6 +14,7 @@ object StandardPids {
     private fun pct(a: Int) = a * 100.0 / 255.0
     private fun trim(a: Int) = (a - 128) * 100.0 / 128.0
     private fun bit(v: Int, b: Int) = (v shr b) and 1 == 1
+    private fun u32(d: IntArray, i: Int): Double = ((d[i].toLong() shl 24) or (d[i + 1].toLong() shl 16) or (d[i + 2].toLong() shl 8) or d[i + 3].toLong()).toDouble()
 
     private fun sig(pid: Int, suffix: String? = null, key: String, unit: ObdUnit, cat: PidCategory,
                     min: Double, max: Double, dec: Int = 0, f: (IntArray) -> Double?): SignalDef {
@@ -150,6 +151,136 @@ object StandardPids {
             sig(0x7C, "O1", "dpf_temp_b1_outlet", CELSIUS, DIESEL, -40.0, 1000.0, 1) { d -> if (bit(d[0], 1)) ab(d, 3) / 10.0 - 40.0 else null },
             sig(0x7C, "I2", "dpf_temp_b2_inlet", CELSIUS, DIESEL, -40.0, 1000.0, 1) { d -> if (bit(d[0], 2)) ab(d, 5) / 10.0 - 40.0 else null },
             sig(0x7C, "O2", "dpf_temp_b2_outlet", CELSIUS, DIESEL, -40.0, 1000.0, 1) { d -> if (bit(d[0], 3)) ab(d, 7) / 10.0 - 40.0 else null })
+
+        // ───── További szabványos PID-ek (SAE J1979 / ISO 15031-5) ─────
+        // A több érzékelős PID-eknél az A bájt bitjei jelzik, mely mezők érvényesek; a nem támogatott mező nem kap értéket.
+        def(0x1D, 1, sig(0x1D, key = "o2_present_4bank", unit = COUNT, cat = OXYGEN, min = 0.0, max = 8.0) { Integer.bitCount(it[0]).toDouble() })
+        statePid(0x1E, 1, StateDef("01.1E", "pto_status", STATUS) { d -> if (bit(d[0], 0)) "pto_on" else "pto_off" })
+        def(0x4F, 4,
+            sig(0x4F, "L", "max_lambda", RATIO, STATUS, 0.0, 255.0) { d -> d[0].toDouble().takeIf { it > 0 } },
+            sig(0x4F, "V", "max_o2_voltage", VOLT, STATUS, 0.0, 255.0) { d -> d[1].toDouble().takeIf { it > 0 } },
+            sig(0x4F, "I", "max_o2_current", MILLIAMP, STATUS, 0.0, 255.0) { d -> d[2].toDouble().takeIf { it > 0 } },
+            sig(0x4F, "M", "max_map", KPA, STATUS, 0.0, 2550.0) { d -> (d[3] * 10.0).takeIf { it > 0 } })
+        def(0x50, 4, sig(0x50, key = "max_maf", unit = GRAMS_PER_SEC, cat = STATUS, min = 0.0, max = 2550.0) { d -> (d[0] * 10.0).takeIf { it > 0 } })
+        def(0x64, 5,
+            sig(0x64, "I", "torque_idle", PERCENT, ENGINE, -125.0, 130.0) { it[0] - 125.0 },
+            sig(0x64, "1", "torque_point1", PERCENT, ENGINE, -125.0, 130.0) { it[1] - 125.0 },
+            sig(0x64, "2", "torque_point2", PERCENT, ENGINE, -125.0, 130.0) { it[2] - 125.0 },
+            sig(0x64, "3", "torque_point3", PERCENT, ENGINE, -125.0, 130.0) { it[3] - 125.0 },
+            sig(0x64, "4", "torque_point4", PERCENT, ENGINE, -125.0, 130.0) { it[4] - 125.0 })
+        def(0x66, 5,
+            sig(0x66, "A", "maf_a", GRAMS_PER_SEC, AIR, 0.0, 2048.0, 2) { d -> if (bit(d[0], 0)) ab(d, 1) / 32.0 else null },
+            sig(0x66, "B", "maf_b", GRAMS_PER_SEC, AIR, 0.0, 2048.0, 2) { d -> if (bit(d[0], 1)) ab(d, 3) / 32.0 else null })
+        def(0x67, 3,
+            sig(0x67, "1", "coolant_temp_1", CELSIUS, TEMPERATURE, -40.0, 215.0) { d -> if (bit(d[0], 0)) d[1] - 40.0 else null },
+            sig(0x67, "2", "coolant_temp_2", CELSIUS, TEMPERATURE, -40.0, 215.0) { d -> if (bit(d[0], 1)) d[2] - 40.0 else null })
+        def(0x68, 7,
+            *listOf("b1s1", "b1s2", "b1s3", "b2s1", "b2s2", "b2s3").mapIndexed { i, n ->
+                sig(0x68, n.uppercase(), "intake_temp_$n", CELSIUS, TEMPERATURE, -40.0, 215.0) { d -> if (bit(d[0], i)) d[i + 1] - 40.0 else null }
+            }.toTypedArray())
+        def(0x69, 7,
+            sig(0x69, "CA", "egr_a_commanded", PERCENT, EXHAUST, 0.0, 100.0, 1) { d -> if (bit(d[0], 0)) pct(d[1]) else null },
+            sig(0x69, "AA", "egr_a_actual", PERCENT, EXHAUST, 0.0, 100.0, 1) { d -> if (bit(d[0], 1)) pct(d[2]) else null },
+            sig(0x69, "EA", "egr_a_error", PERCENT, EXHAUST, -100.0, 99.2, 1) { d -> if (bit(d[0], 2)) trim(d[3]) else null },
+            sig(0x69, "CB", "egr_b_commanded", PERCENT, EXHAUST, 0.0, 100.0, 1) { d -> if (bit(d[0], 3)) pct(d[4]) else null },
+            sig(0x69, "AB", "egr_b_actual", PERCENT, EXHAUST, 0.0, 100.0, 1) { d -> if (bit(d[0], 4)) pct(d[5]) else null },
+            sig(0x69, "EB", "egr_b_error", PERCENT, EXHAUST, -100.0, 99.2, 1) { d -> if (bit(d[0], 5)) trim(d[6]) else null })
+        def(0x6A, 5,
+            sig(0x6A, "CA", "intake_flow_a_commanded", PERCENT, DIESEL, 0.0, 100.0, 1) { d -> if (bit(d[0], 0)) pct(d[1]) else null },
+            sig(0x6A, "PA", "intake_flow_a_position", PERCENT, DIESEL, 0.0, 100.0, 1) { d -> if (bit(d[0], 1)) pct(d[2]) else null },
+            sig(0x6A, "CB", "intake_flow_b_commanded", PERCENT, DIESEL, 0.0, 100.0, 1) { d -> if (bit(d[0], 2)) pct(d[3]) else null },
+            sig(0x6A, "PB", "intake_flow_b_position", PERCENT, DIESEL, 0.0, 100.0, 1) { d -> if (bit(d[0], 3)) pct(d[4]) else null })
+        def(0x6B, 5,
+            *listOf("b1s1", "b1s2", "b2s1", "b2s2").mapIndexed { i, n ->
+                sig(0x6B, n.uppercase(), "egr_temp_$n", CELSIUS, EXHAUST, -40.0, 215.0) { d -> if (bit(d[0], i)) d[i + 1] - 40.0 else null }
+            }.toTypedArray())
+        def(0x6C, 5,
+            sig(0x6C, "CA", "throttle_actuator_a_commanded", PERCENT, ENGINE, 0.0, 100.0, 1) { d -> if (bit(d[0], 0)) pct(d[1]) else null },
+            sig(0x6C, "PA", "throttle_actuator_a_position", PERCENT, ENGINE, 0.0, 100.0, 1) { d -> if (bit(d[0], 1)) pct(d[2]) else null },
+            sig(0x6C, "CB", "throttle_actuator_b_commanded", PERCENT, ENGINE, 0.0, 100.0, 1) { d -> if (bit(d[0], 2)) pct(d[3]) else null },
+            sig(0x6C, "PB", "throttle_actuator_b_position", PERCENT, ENGINE, 0.0, 100.0, 1) { d -> if (bit(d[0], 3)) pct(d[4]) else null })
+        def(0x6D, 11,
+            sig(0x6D, "CA", "rail_a_commanded", KPA, FUEL, 0.0, 655350.0) { d -> if (bit(d[0], 0)) ab(d, 1) * 10.0 else null },
+            sig(0x6D, "AA", "rail_a_actual", KPA, FUEL, 0.0, 655350.0) { d -> if (bit(d[0], 1)) ab(d, 3) * 10.0 else null },
+            sig(0x6D, "TA", "rail_a_temp", CELSIUS, FUEL, -40.0, 215.0) { d -> if (bit(d[0], 2)) d[5] - 40.0 else null },
+            sig(0x6D, "CB", "rail_b_commanded", KPA, FUEL, 0.0, 655350.0) { d -> if (bit(d[0], 3)) ab(d, 6) * 10.0 else null },
+            sig(0x6D, "AB", "rail_b_actual", KPA, FUEL, 0.0, 655350.0) { d -> if (bit(d[0], 4)) ab(d, 8) * 10.0 else null },
+            sig(0x6D, "TB", "rail_b_temp", CELSIUS, FUEL, -40.0, 215.0) { d -> if (bit(d[0], 5)) d[10] - 40.0 else null })
+        def(0x6E, 9,
+            sig(0x6E, "CA", "injection_a_commanded", KPA, FUEL, 0.0, 655350.0) { d -> if (bit(d[0], 0)) ab(d, 1) * 10.0 else null },
+            sig(0x6E, "AA", "injection_a_actual", KPA, FUEL, 0.0, 655350.0) { d -> if (bit(d[0], 1)) ab(d, 3) * 10.0 else null },
+            sig(0x6E, "CB", "injection_b_commanded", KPA, FUEL, 0.0, 655350.0) { d -> if (bit(d[0], 2)) ab(d, 5) * 10.0 else null },
+            sig(0x6E, "AB", "injection_b_actual", KPA, FUEL, 0.0, 655350.0) { d -> if (bit(d[0], 3)) ab(d, 7) * 10.0 else null })
+        def(0x6F, 3,
+            sig(0x6F, "A", "turbo_inlet_pressure_a", KPA, DIESEL, 0.0, 255.0) { d -> if (bit(d[0], 0)) d[1].toDouble() else null },
+            sig(0x6F, "B", "turbo_inlet_pressure_b", KPA, DIESEL, 0.0, 255.0) { d -> if (bit(d[0], 1)) d[2].toDouble() else null })
+        def(0x71, 6,
+            sig(0x71, "CA", "vgt_a_commanded", PERCENT, DIESEL, 0.0, 100.0, 1) { d -> if (bit(d[0], 0)) pct(d[1]) else null },
+            sig(0x71, "PA", "vgt_a_position", PERCENT, DIESEL, 0.0, 100.0, 1) { d -> if (bit(d[0], 1)) pct(d[2]) else null },
+            sig(0x71, "CB", "vgt_b_commanded", PERCENT, DIESEL, 0.0, 100.0, 1) { d -> if (bit(d[0], 2)) pct(d[3]) else null },
+            sig(0x71, "PB", "vgt_b_position", PERCENT, DIESEL, 0.0, 100.0, 1) { d -> if (bit(d[0], 3)) pct(d[4]) else null })
+        def(0x72, 5,
+            sig(0x72, "CA", "wastegate_a_commanded", PERCENT, DIESEL, 0.0, 100.0, 1) { d -> if (bit(d[0], 0)) pct(d[1]) else null },
+            sig(0x72, "PA", "wastegate_a_position", PERCENT, DIESEL, 0.0, 100.0, 1) { d -> if (bit(d[0], 1)) pct(d[2]) else null },
+            sig(0x72, "CB", "wastegate_b_commanded", PERCENT, DIESEL, 0.0, 100.0, 1) { d -> if (bit(d[0], 2)) pct(d[3]) else null },
+            sig(0x72, "PB", "wastegate_b_position", PERCENT, DIESEL, 0.0, 100.0, 1) { d -> if (bit(d[0], 3)) pct(d[4]) else null })
+        def(0x73, 5,
+            sig(0x73, "1", "exhaust_pressure_b1", KPA, EXHAUST, 0.0, 655.35, 2) { d -> if (bit(d[0], 0)) ab(d, 1) * 0.01 else null },
+            sig(0x73, "2", "exhaust_pressure_b2", KPA, EXHAUST, 0.0, 655.35, 2) { d -> if (bit(d[0], 1)) ab(d, 3) * 0.01 else null })
+        def(0x74, 5,
+            sig(0x74, "A", "turbo_rpm_a", RPM, DIESEL, 0.0, 250000.0) { d -> if (bit(d[0], 0)) ab(d, 1) * 10.0 else null },
+            sig(0x74, "B", "turbo_rpm_b", RPM, DIESEL, 0.0, 250000.0) { d -> if (bit(d[0], 1)) ab(d, 3) * 10.0 else null })
+        for ((p, t) in listOf(0x75 to "a", 0x76 to "b")) {
+            def(p, 7,
+                sig(p, "CI", "turbo_${t}_compressor_inlet_temp", CELSIUS, DIESEL, -40.0, 215.0) { d -> if (bit(d[0], 0)) d[1] - 40.0 else null },
+                sig(p, "CO", "turbo_${t}_compressor_outlet_temp", CELSIUS, DIESEL, -40.0, 215.0) { d -> if (bit(d[0], 1)) d[2] - 40.0 else null },
+                sig(p, "TI", "turbo_${t}_turbine_inlet_temp", CELSIUS, DIESEL, -40.0, 1200.0, 1) { d -> if (bit(d[0], 2)) ab(d, 3) / 10.0 - 40.0 else null },
+                sig(p, "TO", "turbo_${t}_turbine_outlet_temp", CELSIUS, DIESEL, -40.0, 1200.0, 1) { d -> if (bit(d[0], 3)) ab(d, 5) / 10.0 - 40.0 else null })
+        }
+        def(0x77, 5,
+            *listOf("b1s1", "b1s2", "b2s1", "b2s2").mapIndexed { i, n ->
+                sig(0x77, n.uppercase(), "charge_air_temp_$n", CELSIUS, TEMPERATURE, -40.0, 215.0) { d -> if (bit(d[0], i)) d[i + 1] - 40.0 else null }
+            }.toTypedArray())
+        // Kipufogógáz-hőmérséklet (EGT): 0x78/0x79 az 1–4., 0x98/0x99 az 5–8. érzékelő
+        for ((p, bank, first) in listOf(Triple(0x78, 1, 1), Triple(0x79, 2, 1), Triple(0x98, 1, 5), Triple(0x99, 2, 5))) {
+            def(p, 9, *(0 until 4).map { i ->
+                sig(p, "S${first + i}", "egt_b${bank}s${first + i}", CELSIUS, EXHAUST, -40.0, 1200.0, 1) { d -> if (bit(d[0], i)) ab(d, 1 + i * 2) / 10.0 - 40.0 else null }
+            }.toTypedArray())
+        }
+        def(0x7B, 7,
+            sig(0x7B, "D", "dpf_b2_delta", KPA, DIESEL, -50.0, 100.0, 2) { d -> if (bit(d[0], 0)) signed16(d, 1) * 0.01 else null },
+            sig(0x7B, "I", "dpf_b2_inlet", KPA, DIESEL, 0.0, 300.0, 2) { d -> if (bit(d[0], 1)) ab(d, 3) * 0.01 else null },
+            sig(0x7B, "O", "dpf_b2_outlet", KPA, DIESEL, 0.0, 300.0, 2) { d -> if (bit(d[0], 2)) ab(d, 5) * 0.01 else null })
+        def(0x7F, 13,
+            sig(0x7F, "T", "engine_total_hours", HOURS, ENGINE, 0.0, 1_200_000.0, 1) { d -> if (bit(d[0], 0)) u32(d, 1) / 3600.0 else null },
+            sig(0x7F, "I", "engine_idle_hours", HOURS, ENGINE, 0.0, 1_200_000.0, 1) { d -> if (bit(d[0], 1)) u32(d, 5) / 3600.0 else null },
+            sig(0x7F, "P", "engine_pto_hours", HOURS, ENGINE, 0.0, 1_200_000.0, 1) { d -> if (bit(d[0], 2)) u32(d, 9) / 3600.0 else null })
+        def(0x83, 9, *(0 until 4).map { i ->
+            sig(0x83, "${i + 1}", "nox_${i + 1}", PPM, EXHAUST, 0.0, 65535.0) { d -> if (bit(d[0], i)) ab(d, 1 + i * 2).toDouble() else null }
+        }.toTypedArray())
+        def(0x84, 1, sig(0x84, key = "manifold_surface_temp", unit = CELSIUS, cat = TEMPERATURE, min = -40.0, max = 215.0) { it[0] - 40.0 })
+        def(0x85, 10,
+            sig(0x85, "R", "def_consumption", LITERS_PER_HOUR, DIESEL, 0.0, 327.675, 3) { d -> if (bit(d[0], 0)) ab(d, 1) * 0.005 else null },
+            sig(0x85, "D", "def_demanded", LITERS_PER_HOUR, DIESEL, 0.0, 327.675, 3) { d -> if (bit(d[0], 1)) ab(d, 3) * 0.005 else null },
+            sig(0x85, "L", "def_tank_level", PERCENT, DIESEL, 0.0, 100.0, 1) { d -> if (bit(d[0], 2)) pct(d[5]) else null })
+        def(0x86, 5,
+            sig(0x86, "1", "pm_b1", MG_PER_M3, EXHAUST, 0.0, 819.0, 2) { d -> if (bit(d[0], 0)) ab(d, 1) * 0.0125 else null },
+            sig(0x86, "2", "pm_b2", MG_PER_M3, EXHAUST, 0.0, 819.0, 2) { d -> if (bit(d[0], 1)) ab(d, 3) * 0.0125 else null })
+        def(0x87, 5,
+            sig(0x87, "A", "map_a", KPA, AIR, 0.0, 2048.0, 1) { d -> if (bit(d[0], 0)) ab(d, 1) / 32.0 else null },
+            sig(0x87, "B", "map_b", KPA, AIR, 0.0, 2048.0, 1) { d -> if (bit(d[0], 1)) ab(d, 3) / 32.0 else null })
+        def(0x8D, 1, sig(0x8D, key = "throttle_g", unit = PERCENT, cat = ENGINE, min = 0.0, max = 100.0, dec = 1) { pct(it[0]) })
+        def(0x8E, 1, sig(0x8E, key = "friction_torque", unit = PERCENT, cat = ENGINE, min = -125.0, max = 130.0) { it[0] - 125.0 })
+        def(0x9D, 4,
+            sig(0x9D, "E", "engine_fuel_rate", GRAMS_PER_SEC, FUEL, 0.0, 1310.7, 2) { d -> ab(d, 0) * 0.02 },
+            sig(0x9D, "V", "vehicle_fuel_rate", GRAMS_PER_SEC, FUEL, 0.0, 1310.7, 2) { d -> ab(d, 2) * 0.02 })
+        def(0x9E, 2, sig(0x9E, key = "exhaust_flow", unit = KG_PER_HOUR, cat = EXHAUST, min = 0.0, max = 13107.0, dec = 1) { ab(it) * 0.2 })
+        def(0xA2, 2, sig(0xA2, key = "cylinder_fuel_rate", unit = MG_PER_STROKE, cat = FUEL, min = 0.0, max = 2048.0, dec = 2) { ab(it) * 0.03125 })
+        def(0xA4, 4,
+            sig(0xA4, "G", "gear", GEAR, TRANSMISSION, 0.0, 15.0) { d -> (d[1] shr 4).toDouble() },
+            sig(0xA4, "R", "gear_ratio", RATIO, TRANSMISSION, 0.0, 65.535, 3) { d -> ab(d, 2).takeIf { it > 0 }?.let { it / 1000.0 } })
+        def(0xA5, 4, sig(0xA5, key = "def_dosing", unit = PERCENT, cat = DIESEL, min = 0.0, max = 127.5, dec = 1) { d -> d[1] * 0.5 })
+        def(0xA6, 4, sig(0xA6, key = "odometer", unit = KM, cat = VEHICLE, min = 0.0, max = 429_496_729.5, dec = 1) { d -> u32(d, 0) / 10.0 })
     }
 
     val all: List<PidDef> = list.toList()
@@ -160,14 +291,18 @@ object StandardPids {
         all.flatMap { p -> p.states.map { it.id to (p to it) } }.toMap()
 
     fun pid(pid: Int): PidDef? = byPid[pid]
-    fun signal(id: String): SignalDef? = bySignal[id]?.second
+    /** Szabványos vagy számított jel definíciója. */
+    fun signal(id: String): SignalDef? = bySignal[id]?.second ?: DerivedSignals.signal(id)
+
+    /** A jel lekérdezéséhez szükséges Mode 01 PID-ek (számított értéknél a bemenetei). */
+    fun requiredPids(id: String): Set<Int> = pidOfSignal(id)?.let { setOf(it.pid) } ?: DerivedSignals.requiredPids(id)
     fun pidOfSignal(id: String): PidDef? = bySignal[id]?.first ?: byState[id]?.first
     fun state(id: String): StateDef? = byState[id]?.second
     val allSignals: List<SignalDef> = all.flatMap { it.signals }
     val allStates: List<StateDef> = all.flatMap { it.states }
 
     /** A PID-bitmaszk-lekérdező PID-ek (0x00, 0x20, …). */
-    val SUPPORT_PIDS = listOf(0x00, 0x20, 0x40, 0x60, 0x80, 0xA0, 0xC0)
+    val SUPPORT_PIDS = listOf(0x00, 0x20, 0x40, 0x60, 0x80, 0xA0, 0xC0, 0xE0)
 
     private fun fuelSystemState(v: Int): String? = when (v) {
         0 -> null

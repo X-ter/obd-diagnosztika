@@ -65,6 +65,10 @@ class ObdClient(val session: ElmSession) {
     var useResponseCountHint: Boolean = false
         private set
 
+    /** Kompressziógyújtású (dízel) motor-e – a 0101 PID alapján; null, ha ismeretlen. A számított értékekhez kell. */
+    var compressionIgnition: Boolean? = null
+        private set
+
     /** Ha a jármű a csoportos kérésekre ismételten hiányosan válaszol, visszaállunk az egyenkénti lekérdezésre. */
     fun disableMultiPid() {
         multiPidSupported = false
@@ -176,6 +180,7 @@ class ObdClient(val session: ElmSession) {
                 multiPidSupported = decoded.map { it.pid }.toSet().containsAll(candidates)
             }
         }
+        compressionIgnition = runCatching { readReadiness()?.compressionIgnition }.getOrNull()
         useResponseCountHint = false
         if (isCan && adapterInfo?.supportsResponseCountHint == true && vehicleInfo?.ecus?.size == 1) {
             val r = session.obd("01001")
@@ -188,7 +193,9 @@ class ObdClient(val session: ElmSession) {
         require(pids.isNotEmpty() && pids.size <= 6)
         // A válaszszám-utótagot ("010C1") csak egy PID-es kérésnél használjuk: az ELM327 a CAN-kereteket
         // számolja, így egy több keretes (több PID-es) válasz az első keret után megszakadna.
-        val hint = useResponseCountHint && pids.size == 1
+        // Egy CAN-keretbe legfeljebb 7 adatbájt fér (szolgáltatásbájt + PID-ek + adatok).
+        val expected = 1 + pids.sumOf { 1 + (StandardPids.pid(it)?.bytes ?: 32) }
+        val hint = useResponseCountHint && pids.size == 1 && expected <= 7
         val cmd = "01" + pids.joinToString("") { "%02X".format(it) } + if (hint) "1" else ""
         return session.obd(cmd, timeoutMs)
     }

@@ -196,7 +196,71 @@ class DecoderTest {
     fun allSignalIdsUnique() {
         val ids = StandardPids.allSignals.map { it.id } + StandardPids.allStates.map { it.id }
         assertEquals(ids.size, ids.toSet().size)
-        val keys = StandardPids.allSignals.map { it.key }
+        val keys = StandardPids.allSignals.map { it.key } + hu.obddiag.core.pid.DerivedSignals.all.map { it.signal.key }
         assertEquals(keys.size, keys.toSet().size)
+    }
+
+    // ───── Bővített PID-lista ─────
+    @Test fun odometer() = assertEquals(153475.8, value("01.A6", 0x00, 0x17, 0x6B, 0x26)!!, 0.01)
+    @Test fun gearAndRatio() {
+        assertEquals(3.0, value("01.A4.G", 0x03, 0x30, 0x05, 0x78)!!, 0.0)
+        assertEquals(1.4, value("01.A4.R", 0x03, 0x30, 0x05, 0x78)!!, 0.0001)
+    }
+    @Test fun egtWithMask() {
+        // csak az 1. érzékelő támogatott: 0x1F40 = 8000 → 800,0 − 40 = 760 °C
+        assertEquals(760.0, value("01.78.S1", 0x01, 0x1F, 0x40, 0, 0, 0, 0, 0, 0)!!, 0.01)
+        assertNull(value("01.78.S2", 0x01, 0x1F, 0x40, 0x1F, 0x40, 0, 0, 0, 0))
+        assertEquals(760.0, value("01.98.S5", 0x01, 0x1F, 0x40, 0, 0, 0, 0, 0, 0)!!, 0.01)
+    }
+    @Test fun engineHours() = assertEquals(1253.443, value("01.7F.T", 0x01, 0x00, 0x44, 0xDA, 0x8C, 0, 0, 0, 0, 0, 0, 0, 0)!!, 0.01)
+    @Test fun turboRpm() = assertEquals(120000.0, value("01.74.A", 0x01, 0x2E, 0xE0, 0, 0)!!, 0.0)
+    @Test fun railCommanded() = assertEquals(150000.0, value("01.6D.CA", 0x01, 0x3A, 0x98, 0, 0, 0, 0, 0, 0, 0, 0)!!, 0.0)
+    @Test fun mafSensorA() = assertEquals(10.0, value("01.66.A", 0x01, 0x01, 0x40, 0, 0)!!, 0.001)
+    @Test fun fuelRateMass() = assertEquals(2.0, value("01.9D.E", 0x00, 0x64, 0, 0)!!, 0.001)
+    @Test fun cylinderFuel() = assertEquals(25.0, value("01.A2", 0x03, 0x20)!!, 0.001)
+
+    @Test
+    fun allPidLengthsMatchFormulas() {
+        // Minden definíció dekódolható a megadott hosszúságú csupa 0xFF adattal (nincs indexhiba).
+        for (p in StandardPids.all) {
+            val d = PidDecoder.decodeOne(p, "7E8", IntArray(p.bytes) { 0xFF })
+            assertEquals(p.pid, d.pid)
+        }
+        assertTrue(StandardPids.allSignals.size >= 200)
+    }
+
+    @Test
+    fun derivedValues() {
+        val now = 10_000L
+        fun l(vararg p: Pair<String, Double>) = p.associate { it.first to (it.second to now) }
+        val r = hu.obddiag.core.pid.DerivedSignals.computeAll(
+            l("01.0B" to 180.0, "01.33" to 100.0, "01.62" to 50.0, "01.63" to 300.0, "01.0C" to 3000.0,
+              "01.10" to 10.0, "01.0D" to 100.0, "01.06" to 2.0, "01.07" to -5.0),
+            changed = setOf("01.0B", "01.62", "01.10", "01.0D", "01.06"), nowMs = now, diesel = false)
+        assertEquals(80.0, r["calc.boost"]!!, 1e-9)
+        assertEquals(150.0, r["calc.torque"]!!, 1e-9)
+        assertEquals(150.0 * 3000 / 9549.0, r["calc.power_kw"]!!, 1e-6)
+        val lph = 10.0 * 3600 / 14.7 / 745.0
+        assertEquals(lph, r["calc.fuel_lph"]!!, 1e-6)
+        assertEquals(lph, r["calc.fuel_l100"]!!, 1e-6) // 100 km/h-nál L/h = L/100 km
+        assertEquals(-3.0, r["calc.trim_b1"]!!, 1e-9)
+    }
+
+    @Test
+    fun derivedSkipsStaleAndDiesel() {
+        val r = hu.obddiag.core.pid.DerivedSignals.computeAll(
+            mapOf("01.10" to (10.0 to 0L), "01.0B" to (150.0 to 0L), "01.33" to (100.0 to 10_000L)),
+            changed = setOf("01.10", "01.33"), nowMs = 10_000L, diesel = true)
+        assertNull(r["calc.fuel_lph"]) // dízelnél a MAF alapú becslés nem érvényes
+        assertNull(r["calc.boost"])    // a MAP értéke elavult
+    }
+
+    @Test
+    fun derivedAvailabilityAndPids() {
+        val avail = hu.obddiag.core.pid.DerivedSignals.available(setOf(0x0B, 0x33, 0x0C)).map { it.id }
+        assertTrue("calc.boost" in avail)
+        assertFalse("calc.power_kw" in avail)
+        assertEquals(setOf(0x0D, 0x5E, 0x10, 0x44), StandardPids.requiredPids("calc.fuel_l100"))
+        assertEquals("calc_boost", StandardPids.signal("calc.boost")!!.key)
     }
 }

@@ -113,7 +113,9 @@ class DashboardViewModel(private val c: AppContainer) : ViewModel() {
     /** A választható jelek: kapcsolat esetén a támogatottak, különben az összes szabványos. */
     fun selectableSignals(): List<String> {
         val supported = c.connection.client.value?.supportedPids
-        return StandardPids.all.filter { supported == null || supported.isEmpty() || it.pid in supported }.flatMap { p -> p.signals.map { it.id } }
+        val standard = StandardPids.all.filter { supported == null || supported.isEmpty() || it.pid in supported }.flatMap { p -> p.signals.map { it.id } }
+        val derived = if (supported.isNullOrEmpty()) hu.obddiag.core.pid.DerivedSignals.all else hu.obddiag.core.pid.DerivedSignals.available(supported)
+        return derived.map { it.id } + standard
     }
 }
 

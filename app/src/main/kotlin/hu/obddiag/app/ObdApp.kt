@@ -93,9 +93,9 @@ class ObdApp : Application() {
 
         // Háttérben szünetel az élő lekérdezés, kivéve, ha éppen naplózás fut.
         ProcessLifecycleOwner.get().lifecycle.addObserver(object : DefaultLifecycleObserver {
-            override fun onStart(owner: LifecycleOwner) = c.live.setPaused(false)
+            override fun onStart(owner: LifecycleOwner) = c.live.setPaused("background", false)
             override fun onStop(owner: LifecycleOwner) {
-                if (c.logging.recording.value == null) c.live.setPaused(true)
+                if (c.logging.recording.value == null) c.live.setPaused("background", true)
             }
         })
     }

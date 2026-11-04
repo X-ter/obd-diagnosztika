@@ -98,10 +98,10 @@ class TerminalViewModel(private val c: AppContainer) : ViewModel() {
         private set
 
     /** A terminál ideje alatt az élő lekérdezés szünetel, hogy a válaszok ne keveredjenek. */
-    fun enter() = c.live.setPaused(true)
+    fun enter() = c.live.setPaused("terminal", true)
 
     fun leave() {
-        c.live.setPaused(false)
+        c.live.setPaused("terminal", false)
         val client = c.connection.client.value ?: return
         c.appScope.launch { runCatching { client.restoreSessionSettings() } }
     }
@@ -336,7 +336,7 @@ fun AboutScreen(nav: NavController) {
             item { SectionTitle(stringResource(R.string.features_working)) }
             item {
                 AppCard {
-                    listOf(R.string.f_conn, R.string.f_dtc, R.string.f_freeze, R.string.f_live, R.string.f_chart, R.string.f_dash, R.string.f_log,
+                    listOf(R.string.f_conn, R.string.f_pids, R.string.f_dtc, R.string.f_freeze, R.string.f_live, R.string.f_chart, R.string.f_dash, R.string.f_log,
                         R.string.f_vehicles, R.string.f_readiness, R.string.f_mode06, R.string.f_mode09, R.string.f_terminal, R.string.f_sim).forEach {
                         FeatureLine(stringResource(it), AppTheme.status.ok)
                     }

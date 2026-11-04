@@ -90,7 +90,8 @@ class LoggingViewModel(val c: AppContainer) : ViewModel() {
 
     fun signalChoices(): List<String> {
         val supported = c.connection.client.value?.supportedPids ?: return emptyList()
-        return StandardPids.all.filter { it.pid in supported }.flatMap { p -> p.signals.map { it.id } }
+        return StandardPids.all.filter { it.pid in supported }.flatMap { p -> p.signals.map { it.id } } +
+            hu.obddiag.core.pid.DerivedSignals.available(supported).map { it.id }
     }
 
     fun start(name: String, signals: Set<String>) = viewModelScope.launch { c.logging.start(name, signals) }
