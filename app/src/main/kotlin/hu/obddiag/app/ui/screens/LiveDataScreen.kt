@@ -257,12 +257,13 @@ fun LiveDataScreen(nav: NavController) {
 }
 
 @Composable
-private fun healthPill(h: PidHealth?, value: LiveValue?, monitored: Boolean) {
+private fun healthPill(h: PidHealth?, value: LiveValue?, monitored: Boolean, hasState: Boolean = false) {
     val now = System.currentTimeMillis()
     when {
         !monitored -> StatusPill(stringResource(R.string.pid_paused), MaterialTheme.colorScheme.outline)
         h == PidHealth.NOT_SUPPORTED -> StatusPill(stringResource(R.string.pid_not_supported), AppTheme.status.danger)
         h == PidHealth.NO_RESPONSE -> StatusPill(stringResource(R.string.pid_no_response), AppTheme.status.warning)
+        hasState && h == PidHealth.OK -> StatusPill(stringResource(R.string.pid_live), AppTheme.status.ok)
         value == null -> StatusPill(stringResource(R.string.pid_waiting), AppTheme.status.info)
         now - value.timestampMs > 5_000 -> StatusPill(stringResource(R.string.pid_stale), AppTheme.status.warning)
         else -> StatusPill(stringResource(R.string.pid_live), AppTheme.status.ok)
@@ -279,7 +280,7 @@ private fun LiveRow(item: LiveItem, value: LiveValue?, state: String?, health: P
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("PID ${"%02X".format(item.pid)}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.width(8.dp))
-                    healthPill(health, value, monitored)
+                    healthPill(health, value, monitored, item.isState && state != null)
                 }
                 if (item.isState) {
                     Text(state?.let { stateLabel(it) } ?: "—", style = MaterialTheme.typography.titleSmall,
@@ -333,7 +334,7 @@ private fun LiveCard(item: LiveItem, value: LiveValue?, state: String?, health: 
         }
         Spacer(Modifier.height(6.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            healthPill(health, value, monitored)
+            healthPill(health, value, monitored, item.isState && state != null)
             Spacer(Modifier.weight(1f))
             Icon(if (monitored) Icons.Outlined.Visibility else Icons.Outlined.VisibilityOff, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
