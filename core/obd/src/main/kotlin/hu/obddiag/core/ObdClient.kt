@@ -65,6 +65,11 @@ class ObdClient(val session: ElmSession) {
     var useResponseCountHint: Boolean = false
         private set
 
+    /** Ha a jármű a csoportos kérésekre ismételten hiányosan válaszol, visszaállunk az egyenkénti lekérdezésre. */
+    fun disableMultiPid() {
+        multiPidSupported = false
+    }
+
     /** Az adapter alaphelyzetbe állítása és beállítása. */
     suspend fun initializeAdapter(): AdapterInfo {
         var reset = session.at("ATZ", ElmSession.RESET_TIMEOUT_MS)
@@ -181,7 +186,10 @@ class ObdClient(val session: ElmSession) {
     /** Mode 01 lekérdezés egy vagy (CAN-en) legfeljebb 6 PID-re. */
     suspend fun readPids(pids: List<Int>, timeoutMs: Long = ElmSession.DEFAULT_TIMEOUT_MS): ElmResult {
         require(pids.isNotEmpty() && pids.size <= 6)
-        val cmd = "01" + pids.joinToString("") { "%02X".format(it) } + if (useResponseCountHint) "1" else ""
+        // A válaszszám-utótagot ("010C1") csak egy PID-es kérésnél használjuk: az ELM327 a CAN-kereteket
+        // számolja, így egy több keretes (több PID-es) válasz az első keret után megszakadna.
+        val hint = useResponseCountHint && pids.size == 1
+        val cmd = "01" + pids.joinToString("") { "%02X".format(it) } + if (hint) "1" else ""
         return session.obd(cmd, timeoutMs)
     }
 

@@ -83,27 +83,39 @@ class PidPoller(
     suspend fun run() {
         while (coroutineContext.isActive) {
             val started = clock()
-            val pids = requested.filter { _health.value[it] != PidHealth.NOT_SUPPORTED && StandardPids.pid(it) != null }
+            val now = clock()
+            val pids = requested.filter { StandardPids.pid(it) != null }
                 .filter { p -> client.supportedPids.isEmpty() || p in client.supportedPids }
             if (pids.isEmpty()) {
                 delay(250)
                 continue
             }
-            val now = clock()
-            val due = pids.filter { p -> now - (lastPolled[p] ?: 0L) >= slowIntervalMs(p) }
+            // A nem válaszoló PID-eket nem dobjuk el végleg: ritkábban, de újrapróbáljuk
+            // (pl. motorindítás közben vagy hidegen egyes vezérlők átmenetileg nem válaszolnak).
+            val due = pids.filter { p ->
+                val interval = if (_health.value[p] == PidHealth.NOT_SUPPORTED) RETRY_UNSUPPORTED_MS else slowIntervalMs(p)
+                now - (lastPolled[p] ?: 0L) >= interval
+            }
             val groups = if (client.multiPidSupported) due.chunked(MULTI_PID_GROUP) else due.map { listOf(it) }
             var anySuccess = false
             var anyAttempt = false
             for (group in groups) {
                 if (!coroutineContext.isActive) return
                 anyAttempt = true
-                val result = safeRead(group)
-                if (group.size > 1 && (result !is ElmResult.Data || result.messages.isEmpty())) {
-                    // A csoportos kérés nem sikerült: ebben a körben egyenként kérdezzük le a PID-eket.
-                    for (p in group) {
-                        if (handleResult(listOf(p), safeRead(listOf(p)))) anySuccess = true
-                    }
-                } else if (handleResult(group, result)) anySuccess = true
+                val answered = handleResult(group, safeRead(group))
+                if (answered.isNotEmpty()) anySuccess = true
+                if (group.size > 1) {
+                    val missing = group - answered
+                    if (missing.isNotEmpty()) {
+                        // Hiányos csoportos válasz: a kimaradt PID-eket egyenként kérdezzük le, és csak
+                        // az egyedi kérésre adott NO DATA számít a PID hibájának.
+                        partialGroups++
+                        for (p in missing) {
+                            if (handleResult(listOf(p), safeRead(listOf(p))).isNotEmpty()) anySuccess = true
+                        }
+                        if (partialGroups >= MAX_PARTIAL_GROUPS && answered.isEmpty()) client.disableMultiPid()
+                    } else partialGroups = 0
+                }
             }
             consecutiveFailedCycles = if (anySuccess || !anyAttempt) 0 else consecutiveFailedCycles + 1
             val elapsed = clock() - started
@@ -113,6 +125,8 @@ class PidPoller(
         }
     }
 
+    private var partialGroups = 0
+
     private suspend fun safeRead(group: List<Int>): ElmResult = try {
         client.readPids(group)
     } catch (e: CancellationException) {
@@ -121,9 +135,14 @@ class PidPoller(
         ElmResult.Error(ElmErrorKind.TIMEOUT, e.message ?: "")
     }
 
-    private suspend fun handleResult(group: List<Int>, result: ElmResult): Boolean {
+    /**
+     * A válasz feldolgozása. Visszaadja, mely PID-ekre érkezett érvényes adat.
+     * Csoportos kérésnél a hiányzó PID-eket nem jelöli hibásnak – azokat a hívó egyenként újrakérdezi.
+     */
+    private suspend fun handleResult(group: List<Int>, result: ElmResult): Set<Int> {
         val ts = clock()
         group.forEach { lastPolled[it] = ts }
+        val single = group.size == 1
         when (result) {
             is ElmResult.Data -> {
                 val decoded = PidDecoder.decode(result.messages)
@@ -134,7 +153,7 @@ class PidPoller(
                 for (pid in group) {
                     val d = byPid[pid]
                     if (d == null) {
-                        markFailure(pid)
+                        if (single) markFailure(pid)
                         continue
                     }
                     failures[pid] = 0
@@ -144,18 +163,20 @@ class PidPoller(
                 }
                 if (samples.isNotEmpty()) _samples.emit(samples)
                 _states.value = states
-                return byPid.isNotEmpty()
+                return byPid.keys.intersect(group.toSet())
             }
             is ElmResult.NoData -> {
-                group.forEach { markFailure(it) }
-                return false
+                if (single) markFailure(group.first())
+                return emptySet()
             }
             is ElmResult.Error -> {
-                if (result.kind == ElmErrorKind.UNKNOWN_COMMAND) group.forEach { setHealth(it, PidHealth.NOT_SUPPORTED) }
-                else group.forEach { setHealth(it, PidHealth.NO_RESPONSE) }
-                return false
+                if (single) {
+                    if (result.kind == ElmErrorKind.UNKNOWN_COMMAND) setHealth(group.first(), PidHealth.NOT_SUPPORTED)
+                    else setHealth(group.first(), PidHealth.NO_RESPONSE)
+                }
+                return emptySet()
             }
-            is ElmResult.Text -> return false
+            is ElmResult.Text -> return emptySet()
         }
     }
 
@@ -172,5 +193,7 @@ class PidPoller(
     companion object {
         const val MULTI_PID_GROUP = 6
         const val MAX_FAILURES = 3
+        const val MAX_PARTIAL_GROUPS = 3
+        const val RETRY_UNSUPPORTED_MS = 30_000L
     }
 }

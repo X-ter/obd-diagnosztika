@@ -167,7 +167,11 @@ class SimulatedElm327(
             0x09 -> mode09(bytes.getOrNull(1) ?: -1)
             else -> listOf(0x7F, mode, 0x11)
         }
-        return search + (response?.let { frames(it) } ?: listOf("NO DATA"))
+        // Valódi ELM327-viselkedés: a válaszszám-utótag a CAN-kereteket számolja, ezért egy több keretes
+        // választ az adapter az első N keret után levág.
+        val countHint = if (cmd.length % 2 == 1) cmd.last().digitToIntOrNull(16) else null
+        val lines = response?.let { frames(it) }?.let { if (countHint != null && headers) it.take(countHint) else it }
+        return search + (lines ?: listOf("NO DATA"))
     }
 
     private fun respondAt(c: String): List<String> = when {

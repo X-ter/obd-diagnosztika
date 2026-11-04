@@ -131,9 +131,8 @@ class LiveDataViewModel(private val c: AppContainer) : ViewModel() {
 
     fun initMonitored(items: List<LiveItem>) {
         if (_monitored.value != null || items.isEmpty()) return
-        val fav = settings.value.favorites
-        val initial = items.filter { it.id in fav }.map { it.id }.toSet()
-        _monitored.value = initial.ifEmpty { items.take(6).map { it.id }.toSet() }
+        // Alapból minden, a jármű által támogatott érték figyelve van; a felhasználó kapcsolhatja ki őket.
+        _monitored.value = items.map { it.id }.toSet()
     }
 
     fun toggleMonitor(id: String) {
