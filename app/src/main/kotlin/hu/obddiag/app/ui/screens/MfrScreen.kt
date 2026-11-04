@@ -202,7 +202,8 @@ private fun DetectionCard(d: MfrDetection, registry: MfrRegistry?, vm: MfrViewMo
             Icon(icon, null, tint = color)
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
-                Text(d.nodes.map { nodeName(it) }.distinct().joinToString(" / "), style = MaterialTheme.typography.titleSmall)
+                val title = if (d is MfrDetection.Identified) nodeName(d.ecu.node) else d.nodes.map { nodeName(it) }.distinct().joinToString(" / ")
+                Text(title, style = MaterialTheme.typography.titleSmall)
                 Text("%03X → %03X".format(d.requestId, d.responseId), style = ValueText.mono, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             StatusPill(stringResource(when (d) {

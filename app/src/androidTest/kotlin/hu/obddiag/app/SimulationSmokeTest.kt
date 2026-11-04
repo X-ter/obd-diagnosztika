@@ -141,6 +141,7 @@ class SimulationSmokeTest {
         Thread.sleep(3_000)
         shot("10c_mfr_static")
         clickText("Élő adatok megnyitása")
+        clickText("Lista")
         waitText("Bruttó motor olajnyomás", 20_000)
         clickText("Bruttó motor olajnyomás")
         waitText("Mért töltőnyomás")
