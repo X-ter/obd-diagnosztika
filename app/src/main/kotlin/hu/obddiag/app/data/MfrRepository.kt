@@ -69,7 +69,8 @@ class MfrRepository(private val context: Context, private val connection: Connec
     }
 
     companion object {
-        const val ASSET = "mfr/psa_peugeot.json.gz"
+        /** gzip-tömörített JSON; a kiterjesztés szándékosan nem .gz, mert azt a fordító kicsomagolná. */
+        const val ASSET = "mfr/psa_peugeot.dat"
         const val LICENSE_ASSET = "mfr/LICENSE-PSA-RE.txt"
     }
 }

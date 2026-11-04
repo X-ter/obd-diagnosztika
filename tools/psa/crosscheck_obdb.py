@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """OBDb (CC BY-SA 4.0) Peugeot jelkészletek összevetése a konvertált PSA-RE adatbázissal.
 Csak ellenőrzésre szolgál: OBDb-adat NEM kerül az appba.
-Futtatás: python3 tools/psa/crosscheck_obdb.py <psa_peugeot.json.gz> <OBDb klónok könyvtára> <riport.md>"""
+Futtatás: python3 tools/psa/crosscheck_obdb.py <psa_peugeot.dat> <OBDb klónok könyvtára> <riport.md>"""
 import gzip, json, glob, sys, collections
 db = json.load(gzip.open(sys.argv[1]))
 by = collections.defaultdict(list)  # (rq, svc, id) -> [(modell, param)]

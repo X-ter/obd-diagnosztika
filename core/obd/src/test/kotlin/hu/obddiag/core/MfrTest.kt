@@ -78,8 +78,8 @@ class MfrTest {
 
     // ───── A valódi, konvertált Peugeot-adatbázis ─────
     private fun realDb(): MfrDatabase {
-        val f = listOf("app/src/main/assets/mfr/psa_peugeot.json.gz", "../../app/src/main/assets/mfr/psa_peugeot.json.gz",
-            "/home/claude/repo/app/src/main/assets/mfr/psa_peugeot.json.gz").map(::File).first { it.exists() }
+        val f = listOf("app/src/main/assets/mfr/psa_peugeot.dat", "../../app/src/main/assets/mfr/psa_peugeot.dat",
+            "/home/claude/repo/app/src/main/assets/mfr/psa_peugeot.dat").map(::File).first { it.exists() }
         return MfrDatabase.fromJson(GZIPInputStream(f.inputStream()).bufferedReader().readText())
     }
 
