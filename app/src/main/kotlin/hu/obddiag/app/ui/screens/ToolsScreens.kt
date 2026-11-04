@@ -117,7 +117,7 @@ class TerminalViewModel(private val c: AppContainer) : ViewModel() {
         lines += Line("> $trimmed", 0)
         busy = true
         viewModelScope.launch {
-            val r = runCatching { client.session.sendRaw(trimmed.uppercase(), 5_000) }
+            val r = runCatching { client.sendRawExclusive(trimmed.uppercase(), 5_000) }
             r.onSuccess { raw ->
                 val out = raw.replace(">", "").split('\r', '\n').map { it.trim() }.filter { it.isNotEmpty() }
                 if (out.isEmpty()) lines += Line("(üres válasz)", 2) else out.forEach { lines += Line(it, 1) }

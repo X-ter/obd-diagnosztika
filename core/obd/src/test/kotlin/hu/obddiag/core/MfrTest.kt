@@ -251,4 +251,21 @@ class MfrTest {
         val r = c.readPids(listOf(0x0C)) as ElmResult.Data
         assertEquals("7E8", r.messages.single().ecu)
     }
+
+    @Test
+    fun terminalCommandDuringManufacturerCycleGoesToObdAddress() = runBlocking {
+        val sim = SimulatedElm327(responseDelayMs = 15)
+        val c = simClient(sim)
+        val db = realDb()
+        val session = MfrSession(c)
+        val ident = MfrIdentifier(MfrDatabase(db.source, db.brand, db.ecus.filter { it.requestId == 0x6A8 }, emptyMap()), session).identify()
+        val reg = MfrRegistry(ident, db.source)
+        val ids = reg.signals.filter { it.isLive }.take(20).map { it.id }.toSet()
+        val job = kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.Default) { MfrPoller(reg, session).cycle(ids) }
+        kotlinx.coroutines.delay(150)
+        // a terminál parancsa egy futó gyártói kör közben érkezik
+        val raw = c.sendRawExclusive("0100")
+        job.join()
+        assertTrue("válasz: $raw", raw.contains("7E8") && raw.contains("41 00"))
+    }
 }

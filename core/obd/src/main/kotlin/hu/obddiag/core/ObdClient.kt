@@ -112,11 +112,18 @@ class ObdClient(val session: ElmSession) {
     }
 
     /**
+     * Nyers parancs (szakértői terminál) a buszzár alatt: így nem csúszhat be egy gyártói olvasás közepére,
+     * amikor az adapter címzése éppen egy másik vezérlőre van állítva.
+     */
+    suspend fun sendRawExclusive(command: String, timeoutMs: Long = ElmSession.DEFAULT_TIMEOUT_MS): String =
+        busLock.lockAndRun { session.sendRaw(command, timeoutMs) }
+
+    /**
      * A munkamenet beállításainak visszaállítása (pl. a szakértői terminál után, ahol a felhasználó
      * megváltoztathatta a fejléc-, visszhang- vagy szűrőbeállításokat).
      */
-    suspend fun restoreSessionSettings() {
-        for (cmd in listOf("ATE0", "ATL0", "ATS1", "ATH1", "ATAT1", "ATCAF1", "ATCRA")) session.at(cmd)
+    suspend fun restoreSessionSettings() = busLock.lockAndRun {
+        for (cmd in listOf("ATE0", "ATL0", "ATS1", "ATH1", "ATAT1", "ATCAF1", "ATCRA", "ATFCSM0")) session.at(cmd)
         when (session.protocol?.canHeaderBytes) {
             11 -> session.at("ATSH7DF")
             29 -> session.at("ATSH18DB33F1")
