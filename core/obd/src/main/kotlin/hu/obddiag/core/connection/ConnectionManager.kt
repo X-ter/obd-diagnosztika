@@ -62,6 +62,40 @@ class ConnectionManager(
     private val _poller = MutableStateFlow<PidPoller?>(null)
     val poller: StateFlow<PidPoller?> = _poller.asStateFlow()
 
+    private val _mfr = MutableStateFlow<hu.obddiag.core.mfr.MfrRegistry?>(null)
+    /** Az azonosított gyártói (PSA) vezérlők jelkészlete; null, ha nincs azonosítás. */
+    val mfr: StateFlow<hu.obddiag.core.mfr.MfrRegistry?> = _mfr.asStateFlow()
+    private var mfrSession: hu.obddiag.core.mfr.MfrSession? = null
+
+    /**
+     * Gyártói vezérlők azonosítása (csak olvasó kérésekkel). Pontos cikkszám-egyezés esetén a vezérlő
+     * értékei elérhetővé válnak az élő adatok között.
+     */
+    suspend fun identifyManufacturer(db: hu.obddiag.core.mfr.MfrDatabase, onProgress: (Int, Int) -> Unit = { _, _ -> }): hu.obddiag.core.mfr.MfrIdentification {
+        val c = _client.value ?: return hu.obddiag.core.mfr.MfrIdentification(emptyList(), 0, true, "Nincs járműkapcsolat")
+        val session = hu.obddiag.core.mfr.MfrSession(c, commLog)
+        commLog.add(CommLog.Direction.INFO, "Gyártói azonosítás indul (${db.source.name} ${db.source.commit.take(8)})")
+        val res = hu.obddiag.core.mfr.MfrIdentifier(db, session).identify(onProgress)
+        commLog.add(CommLog.Direction.INFO, "Gyártói azonosítás: ${res.identified.size} vezérlő azonosítva, ${res.detections.size} válaszolt")
+        val reg = hu.obddiag.core.mfr.MfrRegistry(res, db.source)
+        mfrSession = session
+        hu.obddiag.core.mfr.MfrSignals.registry = reg
+        _mfr.value = reg
+        _poller.value?.mfrPoller = hu.obddiag.core.mfr.MfrPoller(reg, session, isSimulated)
+        return res
+    }
+
+    /** Egyszeri olvasás egy azonosított vezérlő nem élő (konfigurációs, azonosító) adataiból. */
+    suspend fun readManufacturerOnce(ecu: hu.obddiag.core.mfr.MfrEcu, items: List<hu.obddiag.core.mfr.MfrItem>): Map<Int, hu.obddiag.core.mfr.MfrReadResult> {
+        val session = mfrSession ?: return emptyMap()
+        val out = LinkedHashMap<Int, hu.obddiag.core.mfr.MfrReadResult>()
+        session.exclusive {
+            select(ecu)
+            for (it in items) out[it.id] = read(ecu, itemRequest(ecu, it))
+        }
+        return out
+    }
+
     private var transport: ObdTransport? = null
     private var factory: TransportFactory? = null
     private var protocol: ObdProtocol = ObdProtocol.AUTO
@@ -209,6 +243,9 @@ class ConnectionManager(
         watchdogJob?.cancel()
         watchdogJob = null
         _poller.value = null
+        _mfr.value = null
+        mfrSession = null
+        hu.obddiag.core.mfr.MfrSignals.registry = null
         _client.value = null
         transport?.let { safeClose(it) }
         transport = null

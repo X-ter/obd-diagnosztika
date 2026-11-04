@@ -27,11 +27,20 @@ object Labels {
     }
 
     fun signalName(context: Context, signalId: String): String {
+        if (signalId.startsWith("mfr.")) {
+            val reg = hu.obddiag.core.mfr.MfrSignals.registry?.signal(signalId) ?: return signalId
+            return hu.obddiag.core.mfr.MfrRegistry.labelOf(reg.item, reg.param).get(hu.obddiag.core.mfr.MfrSignals.language)
+        }
         val key = StandardPids.signal(signalId)?.key ?: StandardPids.state(signalId)?.key
         return if (key != null) get(context, "pid_$key", signalId) else signalId
     }
 
-    fun stateValue(context: Context, code: String): String = get(context, "state_$code", code)
+    fun stateValue(context: Context, code: String): String = when {
+        code.startsWith("txt:") -> code.removePrefix("txt:")
+        code == "bool:1" -> get(context, "state_bool_on", "1")
+        code == "bool:0" -> get(context, "state_bool_off", "0")
+        else -> get(context, "state_$code", code)
+    }
     fun monitor(context: Context, key: String): String = get(context, "mon_$key", key)
     fun category(context: Context, c: PidCategory): String = get(context, "cat_${c.name.lowercase()}", c.name)
     fun mid(context: Context, key: String): String = get(context, key, key)

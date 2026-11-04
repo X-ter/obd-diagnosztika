@@ -63,6 +63,16 @@ class PidPoller(
         requested = pids
     }
 
+    /** Gyártói lekérdező (azonosítás után állítja be a kapcsolatkezelő). */
+    @Volatile var mfrPoller: hu.obddiag.core.mfr.MfrPoller? = null
+    @Volatile private var mfrRequested: Set<String> = emptySet()
+    private val _mfrHealth = MutableStateFlow<Map<String, PidHealth>>(emptyMap())
+    val mfrHealth: StateFlow<Map<String, PidHealth>> = _mfrHealth.asStateFlow()
+
+    fun setRequestedMfr(ids: Set<String>) {
+        mfrRequested = ids
+    }
+
     fun resetHealth() {
         failures.clear()
         _health.value = emptyMap()
@@ -86,7 +96,9 @@ class PidPoller(
             val now = clock()
             val pids = requested.filter { StandardPids.pid(it) != null }
                 .filter { p -> client.supportedPids.isEmpty() || p in client.supportedPids }
-            if (pids.isEmpty()) {
+            val mfr = mfrPoller
+            val mfrIds = mfrRequested
+            if (pids.isEmpty() && (mfr == null || mfrIds.isEmpty())) {
                 delay(250)
                 continue
             }
@@ -115,6 +127,15 @@ class PidPoller(
                         }
                         if (partialGroups >= MAX_PARTIAL_GROUPS && answered.isEmpty()) client.disableMultiPid()
                     } else partialGroups = 0
+                }
+            }
+            // Gyártói (PSA) értékek – saját címzéssel, a buszzár alatt
+            if (mfr != null && mfrIds.isNotEmpty()) {
+                val r = try { mfr.cycle(mfrIds) } catch (e: CancellationException) { throw e } catch (e: Exception) { null }
+                if (r != null) {
+                    if (r.samples.isNotEmpty()) { _samples.emit(r.samples); anySuccess = true }
+                    if (r.states.isNotEmpty()) { _states.value = _states.value + r.states; anySuccess = true }
+                    if (r.health.isNotEmpty()) _mfrHealth.value = _mfrHealth.value + r.health
                 }
             }
             consecutiveFailedCycles = if (anySuccess || !anyAttempt) 0 else consecutiveFailedCycles + 1

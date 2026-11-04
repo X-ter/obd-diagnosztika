@@ -84,6 +84,10 @@ class LiveDataRepository(
     private val _health = MutableStateFlow<Map<Int, PidHealth>>(emptyMap())
     val health: StateFlow<Map<Int, PidHealth>> = _health.asStateFlow()
 
+    private val _mfrHealth = MutableStateFlow<Map<String, PidHealth>>(emptyMap())
+    /** Gyártói jelek állapota jelazonosító szerint. */
+    val mfrHealth: StateFlow<Map<String, PidHealth>> = _mfrHealth.asStateFlow()
+
     private val _cycleRate = MutableStateFlow(0.0)
     val cycleRate: StateFlow<Double> = _cycleRate.asStateFlow()
 
@@ -124,6 +128,9 @@ class LiveDataRepository(
             connection.poller.flatMapLatest { it?.cycleRate ?: flowOf(0.0) }.collect { _cycleRate.value = it }
         }
         scope.launch {
+            connection.poller.flatMapLatest { it?.mfrHealth ?: flowOf(emptyMap()) }.collect { _mfrHealth.value = it }
+        }
+        scope.launch {
             // Új kapcsolatnál a korábbi értékek már nem érvényesek
             connection.poller.collect { resetValues() }
         }
@@ -131,9 +138,11 @@ class LiveDataRepository(
 
     private fun updatePolling(poller: PidPoller?, signals: Set<String>, isPaused: Boolean) {
         val pids = signals.flatMap { StandardPids.requiredPids(it) }.toSet()
+        val mfrIds = signals.filter { it.startsWith("mfr.") }.toSet()
         poller?.setRequestedPids(pids)
+        poller?.setRequestedMfr(mfrIds)
         poller?.minCycleIntervalMs = minCycleIntervalMs
-        val shouldRun = poller != null && pids.isNotEmpty() && !isPaused
+        val shouldRun = poller != null && (pids.isNotEmpty() || mfrIds.isNotEmpty()) && !isPaused
         if (shouldRun && (pollJob?.isActive != true || runningPoller !== poller)) {
             pollJob?.cancel()
             runningPoller = poller

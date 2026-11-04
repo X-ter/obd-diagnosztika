@@ -180,6 +180,43 @@ for i in range(8):
     PIDS[f"o2wrc_s{i+1}_lambda"] = f"Szélessávú szonda {i+1} – lambda (áram)"
     PIDS[f"o2wrc_s{i+1}_current"] = f"Szélessávú szonda {i+1} – áram"
 
+
+# ───── Gyártói (PSA) diagnosztika ─────
+UI.update({
+"mfr_title": "Gyártói diagnosztika – Peugeot", "mfr_subtitle": "PSA vezérlők (UDS / KWP2000), csak olvasás",
+"mfr_desc": "Motor, váltó, BSI és további vezérlők gyártói értékei (pl. olajnyomás)",
+"mfr_intro": "Az app azonosítja az autó vezérlőit a cikkszámuk alapján, és csak a pontosan azonosított vezérlőmodell és szoftverváltozat értékeit mutatja. Kizárólag olvasó kéréseket küld; írás, kódolás és aktuátorteszt nincs.",
+"mfr_source_note": "Adatforrás: PSA-RE nyílt adatbázis (Apache 2.0). Nem hivatalos, közösségi visszafejtésből származó adat – a valódi autón ellenőrizni kell.",
+"mfr_connect_hint": "Az azonosításhoz csatlakozz az autóhoz (gyújtás bekapcsolva).",
+"mfr_identify": "Vezérlők azonosítása", "mfr_identify_again": "Azonosítás újra",
+"mfr_progress": "Címek ellenőrzése: %1$d / %2$d", "mfr_failed": "Az azonosítás nem sikerült",
+"mfr_no_flow_control": "Az adapter nem támogatja az egyedi flow controlt",
+"mfr_no_flow_control_detail": "A több keretes (hosszabb) válaszok nem olvashatók ezzel az adapterrel; ajánlott egy valódi ELM327 v1.4b+ vagy OBDLink adapter.",
+"mfr_summary": "%1$d vezérlő azonosítva · %2$d válaszolt · %3$d cím ellenőrizve",
+"mfr_live_hint": "%1$d gyártói élő érték érhető el. Az Élő adatok képernyőn a „Gyártói (PSA)” kategóriában kapcsold be, amelyiket figyelni szeretnéd.",
+"mfr_open_live": "Élő adatok megnyitása",
+"mfr_none_title": "Nem válaszolt vezérlő", "mfr_none_message": "Egyetlen ismert PSA-címen sem jött válasz. Lehet, hogy az autó nem PSA-alapú, vagy az adapter nem éri el a belső buszt.",
+"mfr_identified": "Azonosítva", "mfr_ambiguous": "Nem egyértelmű", "mfr_unknown": "Ismeretlen cikkszám",
+"mfr_model": "Vezérlőmodell", "mfr_variant": "Szoftverváltozat", "mfr_part": "Cikkszám", "mfr_protocol": "Protokoll",
+"mfr_values": "Értékek", "mfr_values_count": "%1$d élő, %2$d egyéb",
+"mfr_read_static": "Azonosító és konfigurációs adatok beolvasása",
+"mfr_static_unsupported": "%d azonosítóra a vezérlő nem válaszolt (ezen a változaton nem létezik).",
+"mfr_ambiguous_detail": "A cikkszám több vezérlőmodellhez is illik (%1$s), ezért az app nem mutat értéket – így nem lehet hibás skálázás.",
+"mfr_unknown_detail": "A vezérlő válaszolt, de a cikkszáma nincs az adatbázisban. Hitelesség miatt az app ehhez nem mutat értéket.",
+"f_mfr": "Peugeot gyártói diagnosztika (PSA-RE): vezérlők azonosítása cikkszám alapján, UDS és KWP2000 olvasás, csak az azonosított változat értékei",
+"l_mfr_test": "A Peugeot gyártói értékek közösségi forrásból származnak; valódi autón ellenőrizni kell őket, mielőtt döntést hozol alapjukon.",
+"about_sources": "Adatforrások és licencek",
+"about_psa_re": "Gyártói (PSA) diagnosztikai adatok: PSA-RE – https://github.com/prototux/PSA-RE, Apache License 2.0. Az adatokat az app saját formátumra alakította (csak olvasható azonosítók, Peugeot-modellek). A projekt nem hivatalos, nem kapcsolódik a Stellantishoz.",
+})
+for k, v in {"cmm": "Motorvezérlő", "bva": "Automata váltó", "bsi": "Intelligens kiszolgáló egység (BSI)", "abs": "ABS / ESP",
+             "cmb": "Műszerfal", "bsm": "Motortéri kiszolgáló egység", "clim_av": "Klímavezérlő", "dae": "Elektromos szervokormány",
+             "aas": "Parkolóradar", "addgo": "Részecskeszűrő-adalék", "cav": "Kormányszög-érzékelő", "btel": "Telematika",
+             "rad": "Rádió", "emf": "Multifunkciós kijelző", "afs": "Kanyarfény", "matt": "Utánfutó-vezérlő", "cmu": "Motorvezérlő (alternatív)",
+             "esv": "Elektromos ülés", "piu": "Motorvezérlő (piu)", "bta": "Telematika (BTA)", "cdpl": "Eső- és fényérzékelő",
+             "fse": "Elektromos rögzítőfék", "avp": "Parkolássegítő", "ave": "Holttérfigyelő", "bml": "Mátrix fényszóró",
+             "sam": "Holttérfigyelő", "airbag": "Légzsák"}.items():
+    UI["node_" + k] = v
+
 # ───── Bővített PID-lista ─────
 PIDS.update({
 "o2_present_4bank": "Lambdaszondák száma (4 hengersoros kiosztás)", "pto_status": "Mellékhajtás (PTO) állapota",
@@ -243,7 +280,7 @@ STATES = {
 "fuel_sys_open_temp": "Nyílt hurok – nem elég meleg a motor", "fuel_sys_closed": "Zárt hurok (lambdaszabályozás)",
 "fuel_sys_open_load": "Nyílt hurok – terhelés vagy motorfék", "fuel_sys_open_fault": "Nyílt hurok – rendszerhiba miatt",
 "fuel_sys_closed_fault": "Zárt hurok – szondahibával", "fuel_sys_unknown": "Ismeretlen állapot",
-"pto_on": "Bekapcsolva", "pto_off": "Kikapcsolva",
+"pto_on": "Bekapcsolva", "pto_off": "Kikapcsolva", "bool_on": "Igen (1)", "bool_off": "Nem (0)",
 "sec_air_upstream": "Katalizátor előtt", "sec_air_downstream": "Katalizátor után", "sec_air_atmosphere": "Légkörbe / kikapcsolva", "sec_air_diag": "Diagnosztika alatt",
 }
 OBD_STD = {1: "OBD-II (CARB)", 2: "OBD (EPA)", 3: "OBD és OBD-II", 4: "OBD-I", 5: "Nem OBD-kompatibilis", 6: "EOBD (Európa)", 7: "EOBD és OBD-II",
@@ -265,7 +302,7 @@ MONITORS = {
 "exhaust_sensor": "Kipufogógáz-szenzor", "pm_filter": "Részecskeszűrő (DPF)", "egr_vvt": "EGR / változó szelepvezérlés",
 }
 CATS = {"engine": "Motor", "fuel": "Üzemanyag", "air": "Levegő", "oxygen": "Lambda", "exhaust": "Kipufogó", "temperature": "Hőmérséklet",
-        "electrical": "Elektromos", "vehicle": "Jármű", "transmission": "Sebességváltó", "calculated": "Számított", "status": "Állapot", "diesel": "Dízel / turbó"}
+        "electrical": "Elektromos", "vehicle": "Jármű", "transmission": "Sebességváltó", "calculated": "Számított", "manufacturer": "Gyártói (PSA)", "status": "Állapot", "diesel": "Dízel / turbó"}
 MIDS = {"mid_o2_sensor": "Lambdaszonda-monitor", "mid_catalyst": "Katalizátor-monitor", "mid_egr_vvt": "EGR / VVT-monitor", "mid_evap": "EVAP-monitor",
         "mid_o2_heater": "Lambdaszonda-fűtés", "mid_heated_catalyst": "Fűtött katalizátor", "mid_secondary_air": "Szekunder levegő",
         "mid_fuel_system": "Üzemanyagrendszer", "mid_boost": "Töltőnyomás", "mid_nox_adsorber": "NOx-tároló", "mid_nox_catalyst": "NOx-katalizátor",

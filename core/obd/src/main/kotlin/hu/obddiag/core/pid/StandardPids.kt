@@ -19,7 +19,7 @@ object StandardPids {
     private fun sig(pid: Int, suffix: String? = null, key: String, unit: ObdUnit, cat: PidCategory,
                     min: Double, max: Double, dec: Int = 0, f: (IntArray) -> Double?): SignalDef {
         val id = "01.%02X".format(pid) + (suffix?.let { ".$it" } ?: "")
-        return SignalDef(id, key, unit, cat, min, max, dec, f)
+        return SignalDef(id, key, unit, cat, min, max, dec, decode = f)
     }
 
     private val list = mutableListOf<PidDef>()
@@ -292,7 +292,7 @@ object StandardPids {
 
     fun pid(pid: Int): PidDef? = byPid[pid]
     /** Szabványos vagy számított jel definíciója. */
-    fun signal(id: String): SignalDef? = bySignal[id]?.second ?: DerivedSignals.signal(id)
+    fun signal(id: String): SignalDef? = bySignal[id]?.second ?: DerivedSignals.signal(id) ?: hu.obddiag.core.mfr.MfrSignals.def(id)
 
     /** A jel lekérdezéséhez szükséges Mode 01 PID-ek (számított értéknél a bemenetei). */
     fun requiredPids(id: String): Set<Int> = pidOfSignal(id)?.let { setOf(it.pid) } ?: DerivedSignals.requiredPids(id)

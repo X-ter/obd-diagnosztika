@@ -115,7 +115,8 @@ class DashboardViewModel(private val c: AppContainer) : ViewModel() {
         val supported = c.connection.client.value?.supportedPids
         val standard = StandardPids.all.filter { supported == null || supported.isEmpty() || it.pid in supported }.flatMap { p -> p.signals.map { it.id } }
         val derived = if (supported.isNullOrEmpty()) hu.obddiag.core.pid.DerivedSignals.all else hu.obddiag.core.pid.DerivedSignals.available(supported)
-        return derived.map { it.id } + standard
+        val mfr = c.connection.mfr.value?.signals.orEmpty().filter { it.isLive && it.def != null }.map { it.id }
+        return derived.map { it.id } + standard + mfr
     }
 }
 

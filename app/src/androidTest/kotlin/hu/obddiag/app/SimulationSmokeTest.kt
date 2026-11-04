@@ -131,6 +131,27 @@ class SimulationSmokeTest {
         shot("10_advanced")
         rule.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
 
+        // Peugeot gyártói diagnosztika: azonosítás a szimulált PureTech motorvezérlőn, majd élő olajnyomás
+        clickText("Gyártói diagnosztika – Peugeot")
+        clickText("Vezérlők azonosítása")
+        waitText("CMM_MG1CS042", 120_000)
+        waitText("932130")
+        shot("10b_mfr_identified")
+        clickText("Azonosító és konfigurációs adatok beolvasása")
+        Thread.sleep(3_000)
+        shot("10c_mfr_static")
+        clickText("Élő adatok megnyitása")
+        waitText("Bruttó motor olajnyomás", 20_000)
+        clickText("Bruttó motor olajnyomás")
+        waitText("Mért töltőnyomás")
+        clickText("Mért töltőnyomás")
+        waitText("A vízpumpa állapota")
+        clickText("A vízpumpa állapota")
+        Thread.sleep(4_000)
+        waitText("Bruttó motor olajnyomás")
+        shot("10d_mfr_live")
+        rule.onNodeWithTag("tab_more").performClick()
+
         clickText("Adatnaplózás")
         clickText("Rögzítés indítása")
         rule.waitUntil(5_000) { rule.onAllNodes(hasText("Rögzítés indítása")).fetchSemanticsNodes().size >= 3 }

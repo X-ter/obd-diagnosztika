@@ -76,6 +76,7 @@ object Routes {
     const val COMMLOG = "commlog"
     const val SETTINGS = "settings"
     const val ABOUT = "about"
+    const val MFR = "mfr"
     fun logDetail(id: Long) = "logging/$id"
 }
 
@@ -160,6 +161,7 @@ fun AppRoot() {
                 composable(Routes.COMMLOG) { CommLogScreen(nav) }
                 composable(Routes.SETTINGS) { SettingsScreen(nav) }
                 composable(Routes.ABOUT) { AboutScreen(nav) }
+                composable(Routes.MFR) { hu.obddiag.app.ui.screens.MfrScreen(nav) }
             }
         }
     }

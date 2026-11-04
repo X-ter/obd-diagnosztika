@@ -336,7 +336,7 @@ fun AboutScreen(nav: NavController) {
             item { SectionTitle(stringResource(R.string.features_working)) }
             item {
                 AppCard {
-                    listOf(R.string.f_conn, R.string.f_pids, R.string.f_dtc, R.string.f_freeze, R.string.f_live, R.string.f_chart, R.string.f_dash, R.string.f_log,
+                    listOf(R.string.f_conn, R.string.f_pids, R.string.f_mfr, R.string.f_dtc, R.string.f_freeze, R.string.f_live, R.string.f_chart, R.string.f_dash, R.string.f_log,
                         R.string.f_vehicles, R.string.f_readiness, R.string.f_mode06, R.string.f_mode09, R.string.f_terminal, R.string.f_sim).forEach {
                         FeatureLine(stringResource(it), AppTheme.status.ok)
                     }
@@ -345,9 +345,15 @@ fun AboutScreen(nav: NavController) {
             item { SectionTitle(stringResource(R.string.features_limited)) }
             item {
                 AppCard {
-                    listOf(R.string.l_manufacturer, R.string.l_dtc_db, R.string.l_stn, R.string.l_mode06_legacy, R.string.l_background).forEach {
+                    listOf(R.string.l_manufacturer, R.string.l_mfr_test, R.string.l_dtc_db, R.string.l_stn, R.string.l_mode06_legacy, R.string.l_background).forEach {
                         FeatureLine(stringResource(it), AppTheme.status.warning)
                     }
+                }
+            }
+            item { SectionTitle(stringResource(R.string.about_sources)) }
+            item {
+                AppCard {
+                    Text(stringResource(R.string.about_psa_re), style = MaterialTheme.typography.bodyMedium)
                 }
             }
             item { Text(stringResource(R.string.about_disclaimer), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }

@@ -47,6 +47,15 @@ data class FreezeFrame(val triggerDtc: String?, val values: List<DecodedPid>)
  */
 class ObdClient(val session: ElmSession) {
 
+    /**
+     * Buszzár: a gyártói lekérdezés átállítja az adapter címzését (ATSH/ATCRA), ezért amíg az fut,
+     * szabványos OBD-kérés nem mehet ki. Minden szabványos kérés egyenként veszi fel a zárat.
+     */
+    val busLock = BusLock()
+
+    private suspend fun obd(cmd: String, timeoutMs: Long = ElmSession.DEFAULT_TIMEOUT_MS): ElmResult =
+        busLock.lockAndRun { session.obd(cmd, timeoutMs) }
+
     var adapterInfo: AdapterInfo? = null
         private set
     var vehicleInfo: VehicleConnectionInfo? = null
@@ -130,7 +139,7 @@ class ObdClient(val session: ElmSession) {
     suspend fun connectVehicle(preferred: ObdProtocol = ObdProtocol.AUTO): VehicleConnectionInfo {
         session.at("ATSP${preferred.code}")
         session.protocol = if (preferred == ObdProtocol.AUTO) null else preferred
-        val probe = session.obd("0100", ElmSession.SEARCH_TIMEOUT_MS)
+        val probe = obd("0100", ElmSession.SEARCH_TIMEOUT_MS)
         when (probe) {
             is ElmResult.Error -> throw ObdException(probe.kind, probe.kind.userMessage)
             is ElmResult.NoData -> throw ObdException(ElmErrorKind.UNABLE_TO_CONNECT, "A jármű nem válaszolt (NO DATA). Kapcsold be a gyújtást.")
@@ -141,7 +150,7 @@ class ObdClient(val session: ElmSession) {
             ?: throw ObdException(null, "A protokoll nem azonosítható (ATDPN: $dpn)")
         session.protocol = protocol
         // A keresés eredményét a felismert protokoll szerint újraértelmezzük.
-        val reparsed = session.obd("0100")
+        val reparsed = obd("0100")
         val ecus = (reparsed as? ElmResult.Data)?.messages?.map { it.ecu }?.distinct()
             ?: (probe as? ElmResult.Data)?.messages?.map { it.ecu }?.distinct().orEmpty()
         return VehicleConnectionInfo(protocol, ecus).also { vehicleInfo = it }
@@ -152,7 +161,7 @@ class ObdClient(val session: ElmSession) {
         val result = mutableSetOf<Int>()
         for (base in StandardPids.SUPPORT_PIDS) {
             val cmd = if (mode == 0x02) "%02X%02X00".format(mode, base) else "%02X%02X".format(mode, base)
-            val r = session.obd(cmd) as? ElmResult.Data ?: break
+            val r = obd(cmd) as? ElmResult.Data ?: break
             val respService = mode + 0x40
             var any = false
             for (m in r.messages) {
@@ -176,14 +185,14 @@ class ObdClient(val session: ElmSession) {
             val candidates = supportedPids.filter { it in setOf(0x0C, 0x0D, 0x05, 0x04, 0x11, 0x0F) }.take(3)
             if (candidates.size >= 2) {
                 val cmd = "01" + candidates.joinToString("") { "%02X".format(it) }
-                val decoded = (session.obd(cmd) as? ElmResult.Data)?.let { PidDecoder.decode(it.messages) }.orEmpty()
+                val decoded = (obd(cmd) as? ElmResult.Data)?.let { PidDecoder.decode(it.messages) }.orEmpty()
                 multiPidSupported = decoded.map { it.pid }.toSet().containsAll(candidates)
             }
         }
         compressionIgnition = runCatching { readReadiness()?.compressionIgnition }.getOrNull()
         useResponseCountHint = false
         if (isCan && adapterInfo?.supportsResponseCountHint == true && vehicleInfo?.ecus?.size == 1) {
-            val r = session.obd("01001")
+            val r = obd("01001")
             useResponseCountHint = r is ElmResult.Data && r.firstFor(0x41) != null
         }
     }
@@ -197,11 +206,11 @@ class ObdClient(val session: ElmSession) {
         val expected = 1 + pids.sumOf { 1 + (StandardPids.pid(it)?.bytes ?: 32) }
         val hint = useResponseCountHint && pids.size == 1 && expected <= 7
         val cmd = "01" + pids.joinToString("") { "%02X".format(it) } + if (hint) "1" else ""
-        return session.obd(cmd, timeoutMs)
+        return obd(cmd, timeoutMs)
     }
 
     suspend fun readReadiness(): ReadinessInfo? {
-        val r = session.obd("0101") as? ElmResult.Data ?: return null
+        val r = obd("0101") as? ElmResult.Data ?: return null
         val m = r.firstFor(0x41) ?: return null
         val d = m.data.map { it.toInt() and 0xFF }
         if (d.size < 6 || d[1] != 0x01) return null
@@ -214,7 +223,7 @@ class ObdClient(val session: ElmSession) {
             DtcStatus.PENDING -> "07"
             DtcStatus.PERMANENT -> "0A"
         }
-        return when (val r = session.obd(cmd, 5_000)) {
+        return when (val r = obd(cmd, 5_000)) {
             is ElmResult.Data -> {
                 if (r.messages.isEmpty() && r.negatives.isNotEmpty()) DtcReadResult.NotSupported(r.negatives.first().description)
                 else DtcReadResult.Success(DtcParser.parse(r.messages, status, isCan))
@@ -227,7 +236,7 @@ class ObdClient(val session: ElmSession) {
     }
 
     /** Hibakódok és a hozzájuk tartozó diagnosztikai adatok törlése (Mode 04). */
-    suspend fun clearDtcs(): ClearResult = when (val r = session.obd("04", 8_000)) {
+    suspend fun clearDtcs(): ClearResult = when (val r = obd("04", 8_000)) {
         is ElmResult.Data -> when {
             r.firstFor(0x44) != null -> ClearResult.Success
             r.negatives.isNotEmpty() -> ClearResult.Rejected(r.negatives.first().description)
@@ -242,13 +251,13 @@ class ObdClient(val session: ElmSession) {
     suspend fun readFreezeFrame(): FreezeFrame? {
         val supported = discoverSupported(0x02)
         if (supported.isEmpty()) return null
-        val trigger = (session.obd("020200") as? ElmResult.Data)?.firstFor(0x42)?.data
+        val trigger = (obd("020200") as? ElmResult.Data)?.firstFor(0x42)?.data
             ?.map { it.toInt() and 0xFF }?.takeIf { it.size >= 5 }?.let { DtcParser.decode(it[3], it[4]) }
         val values = mutableListOf<DecodedPid>()
         for (pid in supported.sorted()) {
             if (pid in StandardPids.SUPPORT_PIDS || pid == 0x02) continue
             if (StandardPids.pid(pid) == null) continue
-            val r = session.obd("02%02X00".format(pid)) as? ElmResult.Data ?: continue
+            val r = obd("02%02X00".format(pid)) as? ElmResult.Data ?: continue
             values += PidDecoder.decode(r.messages, responseService = 0x42, freezeFrame = true)
         }
         if (trigger == null && values.isEmpty()) return null
@@ -256,18 +265,18 @@ class ObdClient(val session: ElmSession) {
     }
 
     suspend fun readVin(): String? {
-        val r = session.obd("0902", 5_000) as? ElmResult.Data ?: return null
+        val r = obd("0902", 5_000) as? ElmResult.Data ?: return null
         return Mode09Decoder.vin(r.messages, isCan)
     }
 
     suspend fun readCalibrationIds(): List<Pair<String, String>> =
-        (session.obd("0904", 5_000) as? ElmResult.Data)?.let { Mode09Decoder.calibrationIds(it.messages, isCan) }.orEmpty()
+        (obd("0904", 5_000) as? ElmResult.Data)?.let { Mode09Decoder.calibrationIds(it.messages, isCan) }.orEmpty()
 
     suspend fun readCvns(): List<Pair<String, String>> =
-        (session.obd("0906", 5_000) as? ElmResult.Data)?.let { Mode09Decoder.cvns(it.messages, isCan) }.orEmpty()
+        (obd("0906", 5_000) as? ElmResult.Data)?.let { Mode09Decoder.cvns(it.messages, isCan) }.orEmpty()
 
     suspend fun readEcuNames(): Map<String, String> =
-        (session.obd("090A", 5_000) as? ElmResult.Data)?.let { Mode09Decoder.ecuNames(it.messages, isCan) }.orEmpty()
+        (obd("090A", 5_000) as? ElmResult.Data)?.let { Mode09Decoder.ecuNames(it.messages, isCan) }.orEmpty()
 
     /** Mode 06 teszteredmények (csak CAN formátum). */
     suspend fun readMode06(): List<Mode06Result> {
@@ -275,10 +284,22 @@ class ObdClient(val session: ElmSession) {
         val mids = discoverSupported(0x06).filter { it !in StandardPids.SUPPORT_PIDS }
         val out = mutableListOf<Mode06Result>()
         for (mid in mids) {
-            val r = session.obd("06%02X".format(mid)) as? ElmResult.Data ?: continue
+            val r = obd("06%02X".format(mid)) as? ElmResult.Data ?: continue
             out += Mode06Decoder.decode(r.messages)
         }
         return out
+    }
+}
+
+class BusLock {
+    private val mutex = kotlinx.coroutines.sync.Mutex()
+    suspend fun <T> lockAndRun(block: suspend () -> T): T {
+        mutex.lock()
+        try {
+            return block()
+        } finally {
+            mutex.unlock()
+        }
     }
 }
 

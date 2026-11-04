@@ -17,6 +17,7 @@ import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.DirectionsCar
 import androidx.compose.material.icons.outlined.FiberManualRecord
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Memory
 import androidx.compose.material.icons.outlined.ReceiptLong
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Terminal
@@ -54,6 +55,7 @@ fun MoreScreen(nav: NavController) {
                 MoreItem(Icons.Outlined.FiberManualRecord, stringResource(R.string.logging_title), stringResource(R.string.logging_desc)) { nav.navigate(Routes.LOGGING) }
             }
             if (recording != null) item { StatusPill(stringResource(R.string.logging_active), AppTheme.status.danger) }
+            item { MoreItem(Icons.Outlined.Memory, stringResource(R.string.mfr_title), stringResource(R.string.mfr_desc)) { nav.navigate(Routes.MFR) } }
             item { MoreItem(Icons.Outlined.Troubleshoot, stringResource(R.string.advanced_title), stringResource(R.string.advanced_desc)) { nav.navigate(Routes.ADVANCED) } }
             item { MoreItem(Icons.Outlined.Terminal, stringResource(R.string.terminal_title), stringResource(R.string.terminal_desc)) { nav.navigate(Routes.TERMINAL) } }
             item { SectionTitle(stringResource(R.string.more_setup)) }

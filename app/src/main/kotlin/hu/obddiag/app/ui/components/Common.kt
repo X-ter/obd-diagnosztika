@@ -190,10 +190,11 @@ data class FormattedValue(val text: String, val unit: String, val value: Double)
 fun formatSignal(signalId: String, value: Double?, units: UnitPreferences): FormattedValue {
     val def = StandardPids.signal(signalId)
     val unit = def?.unit ?: ObdUnit.NONE
-    if (value == null) return FormattedValue("—", UnitConverter.convert(0.0, unit, units).symbol, Double.NaN)
+    if (value == null) return FormattedValue("—", if (unit == ObdUnit.CUSTOM) def?.unitText.orEmpty() else UnitConverter.convert(0.0, unit, units).symbol, Double.NaN)
     val c = UnitConverter.convert(value, unit, units)
     val dec = UnitConverter.decimals(unit, def?.decimals ?: 1, units)
-    return FormattedValue(String.format(Locale.getDefault(), "%.${dec}f", c.value), c.symbol, c.value)
+    val symbol = if (unit == ObdUnit.CUSTOM) def?.unitText.orEmpty() else c.symbol
+    return FormattedValue(String.format(Locale.getDefault(), "%.${dec}f", c.value), symbol, c.value)
 }
 
 /** A jel skálája megjelenítési egységben. */

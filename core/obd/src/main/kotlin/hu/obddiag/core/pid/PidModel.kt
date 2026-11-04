@@ -1,7 +1,7 @@
 package hu.obddiag.core.pid
 
 /** Megjelenítési kategória. A fordítást az alkalmazás végzi a kulcs alapján. */
-enum class PidCategory { ENGINE, FUEL, AIR, OXYGEN, EXHAUST, TEMPERATURE, ELECTRICAL, VEHICLE, TRANSMISSION, STATUS, DIESEL, CALCULATED }
+enum class PidCategory { ENGINE, FUEL, AIR, OXYGEN, EXHAUST, TEMPERATURE, ELECTRICAL, VEHICLE, TRANSMISSION, STATUS, DIESEL, CALCULATED, MANUFACTURER }
 
 /** Mértékegység (SI alapú); az átváltásról a [hu.obddiag.core.util.UnitConverter] gondoskodik. */
 enum class ObdUnit(val symbol: String) {
@@ -9,7 +9,7 @@ enum class ObdUnit(val symbol: String) {
     DEGREE("°"), VOLT("V"), MILLIAMP("mA"), SECONDS("s"), MINUTES("min"), KM("km"), RATIO("λ"),
     LITERS_PER_HOUR("L/h"), NEWTON_METER("Nm"), COUNT(""), NONE(""),
     HOURS("h"), PPM("ppm"), MG_PER_M3("mg/m³"), MG_PER_STROKE("mg/löket"), KG_PER_HOUR("kg/h"),
-    L_PER_100KM("L/100km"), KILOWATT("kW"), HORSEPOWER("LE"), AFR("AFR"), GEAR("")
+    L_PER_100KM("L/100km"), KILOWATT("kW"), HORSEPOWER("LE"), AFR("AFR"), GEAR(""), CUSTOM("")
 }
 
 /**
@@ -29,6 +29,10 @@ class SignalDef(
     val min: Double,
     val max: Double,
     val decimals: Int = 0,
+    /** Közvetlen megnevezés (gyártói jeleknél); szabványos PID-nél null, ott a [key] alapján fordít az app. */
+    val labels: hu.obddiag.core.mfr.MfrText? = null,
+    /** Egyedi mértékegység-szöveg, ha [unit] == [ObdUnit.CUSTOM]. */
+    val unitText: String? = null,
     val decode: (IntArray) -> Double?
 )
 

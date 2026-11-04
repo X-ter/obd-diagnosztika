@@ -15,6 +15,12 @@ Actions-artifactként is elérhető.
 | `core:data` | Room adatbázis: járművek, hibakód-előzmények, naplózott mérések, műszerfalprofilok. |
 | `app` | Compose felület, Bluetooth/BLE/Wi-Fi transportok, DataStore beállítások, magyar szövegek (`res/values/strings.xml`), DTC-leírások (`assets/dtc/hu.json`). |
 
+## Gyártói diagnosztika (Peugeot)
+
+A *Továbbiak → Gyártói diagnosztika – Peugeot* menüben az app cikkszám alapján azonosítja a PSA-vezérlőket, és az
+azonosított modell / szoftverváltozat gyártói értékeit (pl. olajnyomás) olvassa, kizárólag olvasó kérésekkel.
+Adatforrás: [PSA-RE](https://github.com/prototux/PSA-RE) (Apache 2.0) – részletek: [tools/psa/README.md](tools/psa/README.md).
+
 ## Bővítés
 
 - **Új nyelv:** `app/src/main/res/values-xx/strings.xml` és `assets/dtc/xx.json`.

@@ -40,6 +40,7 @@ class AppContainer(private val context: Context) {
     val vehicles by lazy { VehicleRepository(db, settings) }
     val logging by lazy { LoggingRepository(appScope, db, live, connection, settings) }
     val dashboards by lazy { DashboardRepository(db) }
+    val mfr by lazy { hu.obddiag.app.data.MfrRepository(context, connection) }
 
     fun transportFactory(target: AdapterTarget): TransportFactory = when (target) {
         is AdapterTarget.Classic -> TransportFactory { BluetoothClassicTransport(context, target.address, target.name) }
@@ -79,6 +80,13 @@ class ObdApp : Application() {
                 c.connection.autoReconnect = s.autoReconnect
                 c.connection.commLog.trafficEnabled = s.commLogTraffic
                 c.live.minCycleIntervalMs = s.pollIntervalMs
+            }
+        }
+        // Ha a gyártói azonosítás már futott, újracsatlakozáskor megismételjük (a jelkészlet a kapcsolathoz kötött).
+        c.appScope.launch {
+            c.connection.state.collectLatest { st ->
+                if (st is ConnectionState.Connected && c.mfr.autoIdentify) c.mfr.identify()
+                if (st !is ConnectionState.Connected) { if (c.mfr.state.value !is hu.obddiag.app.data.MfrState.Running) c.mfr.reset() }
             }
         }
         // A sikeresen kiolvasott VIN-t a járműprofilhoz rendeljük.

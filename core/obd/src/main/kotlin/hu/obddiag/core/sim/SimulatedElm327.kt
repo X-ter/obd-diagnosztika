@@ -37,6 +37,9 @@ class SimulatedElm327(
     private var headers = false
     private var spaces = true
     private var protocolSet = false
+    /** Az ATSH-val beállított kérésfejléc; 7DF = funkcionális OBD-kérés. */
+    private var txHeader = "7DF"
+    private var respHeader = "7E8"
 
     var storedDtcs = mutableListOf("P0301", "P0420")
     var pendingDtcs = mutableListOf("P0171")
@@ -122,7 +125,7 @@ class SimulatedElm327(
 
     /** Egy ECU-üzenet keretezése (fejléc + PCI + adat), szükség esetén több keretre bontva. */
     private fun frames(payload: List<Int>): List<String> {
-        val header = "7E8"
+        val header = respHeader
         fun line(bytes: List<Int>): String {
             val body = hex(*bytes.toIntArray())
             return if (headers) "$header${if (spaces) " " else ""}$body" else body
@@ -151,6 +154,14 @@ class SimulatedElm327(
         if (cmd.startsWith("AT")) return respondAt(cmd.substring(2))
         if (cmd.startsWith("ST")) return listOf("?")
         if (!cmd.all { it.isDigit() || it in 'A'..'F' }) return listOf("?")
+        if (txHeader == PSA_ENGINE_RQ) {
+            respHeader = "688"
+            val r = psaEngine(cmd) ?: return listOf("NO DATA")
+            return frames(r)
+        }
+        if (txHeader != "7DF" && txHeader != "7E0") return listOf("NO DATA")
+        if (cmd.length >= 2 && cmd.substring(0, 2).toInt(16) !in 0x01..0x0A) return listOf("NO DATA")
+        respHeader = "7E8"
         val search = if (!protocolSet) listOf("SEARCHING...") else emptyList()
         protocolSet = true
         // A válaszszám-utótag ("010C1") levágása
@@ -176,7 +187,7 @@ class SimulatedElm327(
     }
 
     private fun respondAt(c: String): List<String> = when {
-        c == "Z" || c == "WS" -> { echo = true; headers = false; spaces = true; protocolSet = false; listOf("", "ELM327 v1.5") }
+        c == "Z" || c == "WS" -> { echo = true; headers = false; spaces = true; protocolSet = false; txHeader = "7DF"; listOf("", "ELM327 v1.5") }
         c == "E0" -> { echo = false; listOf("OK") }
         c == "E1" -> { echo = true; listOf("OK") }
         c == "H1" -> { headers = true; listOf("OK") }
@@ -186,6 +197,9 @@ class SimulatedElm327(
         c == "I" -> listOf("ELM327 v1.5")
         c == "@1" -> listOf("OBD-II SZIMULÁTOR")
         c == "RV" -> listOf("%.1fV".format(java.util.Locale.US, 12.6 + sin(t() / 5) * 0.4 + if (engine().rpm > 600) 1.6 else 0.0))
+        c.startsWith("SH") && c.length == 5 -> { txHeader = c.substring(2); listOf("OK") }
+        c.startsWith("CRA") -> listOf("OK")
+        c.startsWith("FCSH") || c.startsWith("FCSD") || c.startsWith("FCSM") -> listOf("OK")
         c == "DPN" -> listOf("A6")
         c == "DP" -> listOf("AUTO, ISO 15765-4 (CAN 11/500)")
         c.startsWith("SP") -> { protocolSet = c.endsWith("6"); listOf("OK") }
@@ -328,7 +342,40 @@ class SimulatedElm327(
         }
     }
 
+    /**
+     * SZIMULÁLT PSA motorvezérlő a PSA-RE leírása szerint (CMM_MG1CS042, 1.2 PureTech, „B78_V1” változat, cikkszám 932130).
+     * Csak néhány élő DID-re válaszol; minden másra „requestOutOfRange” (7F 22 31), mint egy valódi vezérlő.
+     */
+    private fun psaEngine(cmd: String): List<Int>? {
+        val b = cmd.chunked(2).map { it.toInt(16) }
+        val e = engine()
+        fun u16(v: Double): List<Int> { val x = v.roundToInt().coerceIn(0, 65535); return listOf(x shr 8, x and 0xFF) }
+        fun s16(v: Double): List<Int> { val x = v.roundToInt().coerceIn(-32768, 32767) and 0xFFFF; return listOf(x shr 8, x and 0xFF) }
+        if (b.isEmpty()) return null
+        return when (b[0]) {
+            0x22 -> {
+                if (b.size != 3) return listOf(0x7F, 0x22, 0x13)
+                val did = (b[1] shl 8) or b[2]
+                val data: List<Int>? = when (did) {
+                    0xF0FE -> List(21) { 0x00 } + listOf(0x93, 0x21, 0x30) + List(4) { 0x00 }
+                    0xD400 -> u16(e.rpm)
+                    0xD40A -> s16(e.coolant)
+                    0xD429 -> s16((1.2 + e.rpm / 1500.0) * 1000)            // olajnyomás, 0,001 bar/bit
+                    0xD464 -> u16((1.0 + e.rpm / 1600.0) * 1000)            // előírt olajnyomás
+                    0xD47D -> u16((e.coolant * 1.05 + 273.15) / 0.0234375) // olajhőmérséklet
+                    0xD47E -> u16((1013.0 + e.load * 4) / 0.078125)        // mért töltőnyomás, mbar
+                    0xD651 -> listOf(if (e.coolant > 60) 0x01 else 0x00)    // hűtővízszivattyú állapota (enum)
+                    else -> null
+                }
+                if (data == null) listOf(0x7F, 0x22, 0x31) else listOf(0x62, b[1], b[2]) + data
+            }
+            0x3E -> listOf(0x7E, 0x00)
+            else -> listOf(0x7F, b[0], 0x11)
+        }
+    }
+
     companion object {
+        const val PSA_ENGINE_RQ = "6A8"
         /** Szándékosan felismerhetően fiktív alvázszám. */
         const val SIM_VIN = "SMLT0BD2026000001"
     }

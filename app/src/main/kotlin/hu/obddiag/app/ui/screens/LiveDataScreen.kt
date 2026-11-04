@@ -108,13 +108,18 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /** A listában megjeleníthető elem: numerikus jel vagy állapot. */
-data class LiveItem(val id: String, val pid: Int, val category: PidCategory, val isState: Boolean)
+/** pid: szabványos PID; -1 = számított érték; -2 = gyártói (PSA) érték, ekkor [source] a vezérlő és a kérés. */
+data class LiveItem(val id: String, val pid: Int, val category: PidCategory, val isState: Boolean, val source: String? = null)
+
+const val MFR = -2
 
 class LiveDataViewModel(private val c: AppContainer) : ViewModel() {
     val connection = c.connection.state
     val values = c.live.values
     val states = c.live.states
     val health = c.live.health
+    val mfrHealth = c.live.mfrHealth
+    val mfr = c.connection.mfr
     val cycleRate = c.live.cycleRate
     val tick = c.live.tick
     val settings = c.settings.settings.stateIn(viewModelScope, SharingStarted.Eagerly, AppSettings())
@@ -130,13 +135,19 @@ class LiveDataViewModel(private val c: AppContainer) : ViewModel() {
         }
         // Számított értékek: nincs saját PID-jük (pid = -1), a bemeneteik alapján jelennek meg
         val derived = DerivedSignals.available(supported).map { LiveItem(it.id, -1, PidCategory.CALCULATED, false) }
-        return standard + derived
+        // Gyártói (PSA) élő értékek: csak az azonosított vezérlők, az azonosított szoftverváltozat szerint
+        val mfr = c.connection.mfr.value?.signals.orEmpty().filter { it.isLive }.map { sig ->
+            LiveItem(sig.id, MFR, PidCategory.MANUFACTURER, sig.def == null,
+                "${sig.ecu.node} · ${if (sig.ecu.readService == 0x22) "22 %04X".format(sig.item.id) else "21 %02X".format(sig.item.id)}")
+        }
+        return standard + derived + mfr
     }
 
     fun initMonitored(items: List<LiveItem>) {
         if (_monitored.value != null || items.isEmpty()) return
         // Alapból minden, a jármű által támogatott érték figyelve van; a felhasználó kapcsolhatja ki őket.
-        _monitored.value = items.map { it.id }.toSet()
+        // A gyártói értékeket a felhasználó kapcsolja be egyenként (sok van belőlük, és mindegyik külön kérés).
+        _monitored.value = items.filter { it.pid != MFR }.map { it.id }.toSet()
     }
 
     fun toggleMonitor(id: String) {
@@ -165,7 +176,9 @@ fun LiveDataScreen(nav: NavController) {
     val health by vm.health.collectAsStateWithLifecycle()
     val monitoredOrNull by vm.monitored.collectAsStateWithLifecycle()
     val rate by vm.cycleRate.collectAsStateWithLifecycle()
-    val items = remember(conn) { vm.available() }
+    val mfrReg by vm.mfr.collectAsStateWithLifecycle()
+    val mfrHealth by vm.mfrHealth.collectAsStateWithLifecycle()
+    val items = remember(conn, mfrReg) { vm.available() }
     val monitored = monitoredOrNull.orEmpty()
     var query by rememberSaveable { mutableStateOf("") }
     var category by rememberSaveable { mutableStateOf<PidCategory?>(null) }
@@ -243,14 +256,14 @@ fun LiveDataScreen(nav: NavController) {
             when (settings.liveViewMode) {
                 LiveViewMode.LIST -> LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(filtered, key = { it.id }) { item ->
-                        LiveRow(item, values[item.id], states[item.id], health[item.pid], item.id in monitored, item.id in settings.favorites, settings,
+                        LiveRow(item, values[item.id], states[item.id], if (item.pid == MFR) mfrHealth[item.id] else health[item.pid], item.id in monitored, item.id in settings.favorites, settings,
                             onToggle = { vm.toggleMonitor(item.id) }, onFavorite = { vm.toggleFavorite(item.id) })
                     }
                 }
                 LiveViewMode.CARDS -> LazyVerticalGrid(GridCells.Adaptive(160.dp), contentPadding = PaddingValues(16.dp),
                     horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     items(filtered, key = { it.id }) { item ->
-                        LiveCard(item, values[item.id], states[item.id], health[item.pid], item.id in monitored, item.id in settings.favorites, settings,
+                        LiveCard(item, values[item.id], states[item.id], if (item.pid == MFR) mfrHealth[item.id] else health[item.pid], item.id in monitored, item.id in settings.favorites, settings,
                             onToggle = { vm.toggleMonitor(item.id) }, onFavorite = { vm.toggleFavorite(item.id) })
                     }
                 }
@@ -282,7 +295,7 @@ private fun LiveRow(item: LiveItem, value: LiveValue?, state: String?, health: P
             Column(Modifier.weight(1f)) {
                 Text(signalName(item.id), style = MaterialTheme.typography.bodyLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(if (item.pid >= 0) "PID ${"%02X".format(item.pid)}" else stringResource(R.string.calculated),
+                    Text(when { item.pid >= 0 -> "PID ${"%02X".format(item.pid)}"; item.pid == MFR -> item.source.orEmpty(); else -> stringResource(R.string.calculated) },
                         style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.width(8.dp))
                     healthPill(health, value, monitored, item.isState && state != null)
