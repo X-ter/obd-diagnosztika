@@ -278,7 +278,7 @@ object StandardPids {
         def(0xA2, 2, sig(0xA2, key = "cylinder_fuel_rate", unit = MG_PER_STROKE, cat = FUEL, min = 0.0, max = 2048.0, dec = 2) { ab(it) * 0.03125 })
         def(0xA4, 4,
             sig(0xA4, "G", "gear", GEAR, TRANSMISSION, 0.0, 15.0) { d -> (d[1] shr 4).toDouble() },
-            sig(0xA4, "R", "gear_ratio", RATIO, TRANSMISSION, 0.0, 65.535, 3) { d -> ab(d, 2).takeIf { it > 0 }?.let { it / 1000.0 } })
+            sig(0xA4, "R", "gear_ratio", NONE, TRANSMISSION, 0.0, 65.535, 3) { d -> ab(d, 2).takeIf { it > 0 }?.let { it / 1000.0 } })
         def(0xA5, 4, sig(0xA5, key = "def_dosing", unit = PERCENT, cat = DIESEL, min = 0.0, max = 127.5, dec = 1) { d -> d[1] * 0.5 })
         def(0xA6, 4, sig(0xA6, key = "odometer", unit = KM, cat = VEHICLE, min = 0.0, max = 429_496_729.5, dec = 1) { d -> u32(d, 0) / 10.0 })
     }
