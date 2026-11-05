@@ -15,7 +15,8 @@ class MfrSignal(
     /** A nyers értéket ennyivel kell szorozni az [ObdUnit] szerinti egységhez (pl. bar → kPa: 100). */
     val unitMultiplier: Double
 ) {
-    val isLive: Boolean get() = item.kind == "live"
+    /** Folyamatosan lekérdezhető élő érték. Biztonságkritikus vezérlőnél (fék, kormány…) soha. */
+    val isLive: Boolean get() = item.kind == "live" && !ecu.safetyCritical
 }
 
 /**
@@ -60,6 +61,7 @@ class MfrRegistry(val identification: MfrIdentification, val source: MfrSource) 
     /** A kért jelekhez tartozó olvasások vezérlőnként csoportosítva (egy azonosító csak egyszer). */
     fun plan(signalIds: Collection<String>): Map<MfrEcu, List<Pair<MfrItem, List<MfrSignal>>>> =
         signalIds.mapNotNull { byId[it] }
+            .filter { !it.ecu.safetyCritical }   // biztonsági okból: fék-, kormány-, légzsák-vezérlőt nem kérdezünk folyamatosan
             .groupBy { it.ecu }
             .mapValues { (_, sigs) -> sigs.groupBy { it.item }.map { (item, s) -> item to s } }
 

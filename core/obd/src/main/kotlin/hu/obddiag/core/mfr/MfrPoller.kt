@@ -27,7 +27,7 @@ class MfrPoller(
 
     private fun intervalMs(item: MfrItem, k: String): Long = when {
         k in notSupported -> RETRY_UNSUPPORTED_MS
-        item.kind == "live" -> 0
+        item.kind == "live" -> MIN_LIVE_MS
         else -> SLOW_KIND_MS
     }
 
@@ -76,8 +76,9 @@ class MfrPoller(
                         else -> {
                             val n = (failures[k] ?: 0) + 1
                             failures[k] = n
+                            // nem válaszol: ritkábban próbáljuk újra, de nem jelöljük „nem támogatott”-nak (az csak NRC alapján jár)
                             if (n >= 3) notSupported += k
-                            sigs.forEach { health[it.id] = if (n >= 3) PidHealth.NOT_SUPPORTED else PidHealth.NO_RESPONSE }
+                            sigs.forEach { health[it.id] = PidHealth.NO_RESPONSE }
                         }
                     }
                 }
@@ -88,6 +89,8 @@ class MfrPoller(
 
     companion object {
         const val SLOW_KIND_MS = 30_000L
+        /** egy élő azonosító legfeljebb ilyen gyakran (a busz és a vezérlő kímélése) */
+        const val MIN_LIVE_MS = 500L
         const val RETRY_UNSUPPORTED_MS = 60_000L
     }
 }

@@ -76,6 +76,8 @@ class ConnectionManager(
         val session = hu.obddiag.core.mfr.MfrSession(c, commLog)
         commLog.add(CommLog.Direction.INFO, "Gyártói azonosítás indul (${db.source.name} ${db.source.commit.take(8)})")
         val res = hu.obddiag.core.mfr.MfrIdentifier(db, session).identify(onProgress)
+        // az azonosításhoz megnyitott KWP-sessionök szabályos lezárása (ne maradjon vezérlő diagnosztikai módban)
+        try { session.exclusive { closeSessions() } } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (_: Exception) { }
         commLog.add(CommLog.Direction.INFO, "Gyártói azonosítás: ${res.identified.size} vezérlő azonosítva, ${res.detections.size} válaszolt")
         // az azonosított vezérlők adatai itt töltődnek be (fájlművelet) – ne a hívó szálán
         val reg = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { hu.obddiag.core.mfr.MfrRegistry(res, db.source) }
@@ -86,13 +88,36 @@ class ConnectionManager(
         return res
     }
 
+    /** Az utolsó gyártói olvasások naplója (a jelentésbe). */
+    val mfrReadLog: List<String> get() = mfrSession?.readLog.orEmpty()
+
+    /** Egy azonosított vezérlő gyártói hibakódjainak olvasása (a session a végén lezárul). */
+    suspend fun readManufacturerDtcs(ecu: hu.obddiag.core.mfr.MfrEcu): hu.obddiag.core.mfr.MfrDtcResult {
+        val session = mfrSession ?: return hu.obddiag.core.mfr.MfrDtcResult.Failed("Nincs azonosított vezérlő")
+        return session.exclusive {
+            try { select(ecu); readDtcs(ecu) } finally { if (ecu.safetyCritical) closeSessions() }
+        }
+    }
+
+    /** Gyártói hibakódok törlése – csak a felhasználó megerősítése után hívható. */
+    suspend fun clearManufacturerDtcs(ecu: hu.obddiag.core.mfr.MfrEcu): hu.obddiag.core.mfr.MfrReadResult {
+        val session = mfrSession ?: return hu.obddiag.core.mfr.MfrReadResult.Failed("Nincs azonosított vezérlő")
+        return session.exclusive {
+            try { select(ecu, forceSession = true); clearDtcs(ecu) } finally { closeSessions() }
+        }
+    }
+
     /** Egyszeri olvasás egy azonosított vezérlő nem élő (konfigurációs, azonosító) adataiból. */
     suspend fun readManufacturerOnce(ecu: hu.obddiag.core.mfr.MfrEcu, items: List<hu.obddiag.core.mfr.MfrItem>): Map<Int, hu.obddiag.core.mfr.MfrReadResult> {
         val session = mfrSession ?: return emptyMap()
         val out = LinkedHashMap<Int, hu.obddiag.core.mfr.MfrReadResult>()
         session.exclusive {
-            select(ecu)
-            for (it in items) out[it.id] = read(ecu, itemRequest(ecu, it))
+            try {
+                select(ecu)
+                for (it in items) out[it.id] = read(ecu, itemRequest(ecu, it))
+            } finally {
+                if (ecu.safetyCritical) closeSessions()
+            }
         }
         return out
     }
@@ -245,6 +270,10 @@ class ConnectionManager(
         watchdogJob = null
         _poller.value = null
         _mfr.value = null
+        // nyitott gyártói KWP-sessionök szabályos lezárása (legfeljebb 3 s, ha a kapcsolat még él)
+        mfrSession?.let { s ->
+            try { kotlinx.coroutines.withTimeoutOrNull(3_000) { s.exclusive { closeSessions() } } } catch (_: Exception) { }
+        }
         mfrSession = null
         hu.obddiag.core.mfr.MfrSignals.registry = null
         _client.value = null

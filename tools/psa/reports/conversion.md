@@ -1,62 +1,71 @@
 # PSA-RE konverziós riport
 
-PSA-RE 67f7581e | márka: all | ECU-modellek: 423 | azonosítók: 14659 (élő: 9296) | paraméterek: 47877 | nem egyértelmű cikkszám: 215 | méret: 21.8 MB → 2.90 MB (gzip)
+PSA-RE 67f7581e | márka: all | ECU-modellek: 423 | azonosítók: 14538 (élő: 9287) | paraméterek: 47717 | nem egyértelmű cikkszám: 215 | méret: 29.2 MB → 4.05 MB (gzip)
 
 ## Kihagyva
 
-- speciális azonosító fájl: 244
-- nem olvasható: 149
-- paraméter nélküli azonosító: 142
+- speciális azonosító fájl: 258
+- nem olvasható: 146
+- paraméter nélküli azonosító: 144
 - mapped (táblázatos) – még nem támogatott: 99
 - nincs azonosítás / cikkszám: 34
 - nem CAN / nem UDS-KWP: 28
 - nincs olvasható adat: 1
 
-## Protokoll-ellentmondások a forrásban (43) – javítva
+## Protokoll-ellentmondások a forrásban (52) – javítva
 
-- AEE2004.ev/CMM/DCM34_P: a címzés UDS-t ír, de az azonosítás (21FE) és az adatok (lids/) KWP-sek → KWP-PSA2000
-- AEE2004.ev/CMM/EDC17CP42: a címzés UDS-t ír, de az azonosítás (21FE) és az adatok (lids/) KWP-sek → KWP-PSA2000
-- AEE2004.ev/CMM/HDI_SID807_BR2: a címzés UDS-t ír, de az azonosítás (21FE) és az adatok (lids/) KWP-sek → KWP-PSA2000
-- AEE2004.ev/CMM/ME749_EC5: a címzés UDS-t ír, de az azonosítás (21FE) és az adatok (lids/) KWP-sek → KWP-PSA2000
-- AEE2004.ev/CMM/MEV17_4_2: a címzés UDS-t ír, de az azonosítás (21FE) és az adatok (lids/) KWP-sek → KWP-PSA2000
-- AEE2004.ev/CMM/V344: a címzés UDS-t ír, de az azonosítás (21FE) és az adatok (lids/) KWP-sek → KWP-PSA2000
-- AEE2004.ev/CMM/V345: a címzés UDS-t ír, de az azonosítás (21FE) és az adatok (lids/) KWP-sek → KWP-PSA2000
-- AEE2004.ev/CMM/V46: a címzés UDS-t ír, de az azonosítás (21FE) és az adatok (lids/) KWP-sek → KWP-PSA2000
-- AEE2004.ev/CMM/V46_21: a címzés UDS-t ír, de az azonosítás (21FE) és az adatok (lids/) KWP-sek → KWP-PSA2000
-- AEE2004.full/AFS/AFS: a címzés UDS-t ír, de az azonosítás (2180) és az adatok (lids/) KWP-sek → KWP-PSA2000
-- AEE2004.full/CLIM_AV/CLIMATE_AUTO: a címzés UDS-t ír, de az azonosítás (2180) és az adatok (lids/) KWP-sek → KWP-PSA2000
-- AEE2004.full/CMM/DCM35_BR2: a címzés UDS-t ír, de az azonosítás (21FE) és az adatok (lids/) KWP-sek → KWP-PSA2000
-- AEE2004.full/CMM/ME745: a címzés UDS-t ír, de az azonosítás (21FE) és az adatok (lids/) KWP-sek → KWP-PSA2000
-- AEE2004.full/CMM/MM6KP: a címzés UDS-t ír, de az azonosítás (21FE) és az adatok (lids/) KWP-sek → KWP-PSA2000
-- AEE2004.full/KML/KML: a címzés UDS-t ír, de az azonosítás (2180) és az adatok (lids/) KWP-sek → KWP-PSA2000
-- AEE2010.eco/CMM/V46_6: a címzés UDS-t ír, de az azonosítás (21FE) és az adatok (lids/) KWP-sek → KWP-PSA2000
-- AEE2010.ev/CMM/EDC17C10_BR2: a címzés UDS-t ír, de az azonosítás (21FE) és az adatok (lids/) KWP-sek → KWP-PSA2000
-- AEE2010.full/CMM/ME745_EC5: a címzés UDS-t ír, de az azonosítás (21FE) és az adatok (lids/) KWP-sek → KWP-PSA2000
-- AEE2010.full/CMM/MED17_4_2: a címzés UDS-t ír, de az azonosítás (21FE) és az adatok (lids/) KWP-sek → KWP-PSA2000
-- AEE2010.full/CMM/MEVD17_4_2: a címzés UDS-t ír, de az azonosítás (21FE) és az adatok (lids/) KWP-sek → KWP-PSA2000
-- AEE2010.full/CMM/V46_32: a címzés UDS-t ír, de az azonosítás (21FE) és az adatok (lids/) KWP-sek → KWP-PSA2000
-- AEE2010.full/CMM/V46_52: a címzés UDS-t ír, de az azonosítás (21FE) és az adatok (lids/) KWP-sek → KWP-PSA2000
-- FIAT.full/RBG/SAC_TRW: a címzés UDS-t ír, de az azonosítás (1A87) és az adatok (lids/) KWP-sek → KWP-PSA2000
-- MMC.full/AAS/AAS_MMC: a címzés UDS-t ír, de az azonosítás (1A87) és az adatok (lids/) KWP-sek → KWP-PSA2000
-- MMC.full/ABS/ABS: a címzés UDS-t ír, de az azonosítás (1A87) és az adatok (lids/) KWP-sek → KWP-PSA2000
-- MMC.full/ABS/ABS_4X4: a címzés UDS-t ír, de az azonosítás (1A87) és az adatok (lids/) KWP-sek → KWP-PSA2000
-- MMC.full/ABS/ESP: a címzés UDS-t ír, de az azonosítás (1A87) és az adatok (lids/) KWP-sek → KWP-PSA2000
-- MMC.full/ABS/ESP_4X4: a címzés UDS-t ír, de az azonosítás (1A87) és az adatok (lids/) KWP-sek → KWP-PSA2000
-- MMC.full/AFS/CORPRO: a címzés UDS-t ír, de az azonosítás (1A87) és az adatok (lids/) KWP-sek → KWP-PSA2000
-- MMC.full/AFS/CORPRO_I3I4: a címzés UDS-t ír, de az azonosítás (1A87) és az adatok (lids/) KWP-sek → KWP-PSA2000
-- MMC.full/AWD/TRANSMISSION: a címzés UDS-t ír, de az azonosítás (1A87) és az adatok (lids/) KWP-sek → KWP-PSA2000
-- MMC.full/BML/KOS: a címzés UDS-t ír, de az azonosítás (1A87) és az adatok (lids/) KWP-sek → KWP-PSA2000
-- MMC.full/BML/WCM: a címzés UDS-t ír, de az azonosítás (1A87) és az adatok (lids/) KWP-sek → KWP-PSA2000
-- MMC.full/BSI/ETACS_SUV: a címzés UDS-t ír, de az azonosítás (1A87) és az adatok (lids/) KWP-sek → KWP-PSA2000
-- MMC.full/BVA/BV_CVT: a címzés UDS-t ír, de az azonosítás (1A87) és az adatok (lids/) KWP-sek → KWP-PSA2000
-- MMC.full/CAV/CAV: a címzés UDS-t ír, de az azonosítás (1A87) és az adatok (lids/) KWP-sek → KWP-PSA2000
-- MMC.full/CAV/SAS: a címzés UDS-t ír, de az azonosítás (1A87) és az adatok (lids/) KWP-sek → KWP-PSA2000
-- MMC.full/CMB/HEADLAMP_LEVELLING: a címzés UDS-t ír, de az azonosítás (1A87) és az adatok (lids/) KWP-sek → KWP-PSA2000
-- MMC.full/DAE/EPS: a címzés UDS-t ír, de az azonosítás (1A87) és az adatok (lids/) KWP-sek → KWP-PSA2000
-- MMC.full/DAE/EPS_M: a címzés UDS-t ír, de az azonosítás (1A87) és az adatok (lids/) KWP-sek → KWP-PSA2000
-- MMC.full/OBC/OBC_DCDC: a címzés UDS-t ír, de az azonosítás (1A87) és az adatok (lids/) KWP-sek → KWP-PSA2000
-- MMC.full/STT/STT_MMC: a címzés UDS-t ír, de az azonosítás (1A87) és az adatok (lids/) KWP-sek → KWP-PSA2000
-- MMC.full/TBMU/BMU: a címzés UDS-t ír, de az azonosítás (1A9C) és az adatok (lids/) KWP-sek → KWP-PSA2000
+- AEE2004.ev/BVA/BVMP: a címzés UDS-t ír, de az azonosítás (21FE) KWP-s és vannak lids/ adatok → KWP-PSA2000 (a dids/ kimarad)
+- AEE2004.ev/CMB/CLUSTER: a címzés UDS-t ír, de az azonosítás (2180) KWP-s és vannak lids/ adatok → KWP-PSA2000 (a dids/ kimarad)
+- AEE2004.ev/CMM/DCM34_P: a címzés UDS-t ír, de az azonosítás (21FE) KWP-s és vannak lids/ adatok → KWP-PSA2000
+- AEE2004.ev/CMM/EDC17CP42: a címzés UDS-t ír, de az azonosítás (21FE) KWP-s és vannak lids/ adatok → KWP-PSA2000
+- AEE2004.ev/CMM/HDI_SID807_BR2: a címzés UDS-t ír, de az azonosítás (21FE) KWP-s és vannak lids/ adatok → KWP-PSA2000
+- AEE2004.ev/CMM/ME749_EC5: a címzés UDS-t ír, de az azonosítás (21FE) KWP-s és vannak lids/ adatok → KWP-PSA2000
+- AEE2004.ev/CMM/MEV17_4_2: a címzés UDS-t ír, de az azonosítás (21FE) KWP-s és vannak lids/ adatok → KWP-PSA2000
+- AEE2004.ev/CMM/V344: a címzés UDS-t ír, de az azonosítás (21FE) KWP-s és vannak lids/ adatok → KWP-PSA2000
+- AEE2004.ev/CMM/V345: a címzés UDS-t ír, de az azonosítás (21FE) KWP-s és vannak lids/ adatok → KWP-PSA2000
+- AEE2004.ev/CMM/V46: a címzés UDS-t ír, de az azonosítás (21FE) KWP-s és vannak lids/ adatok → KWP-PSA2000
+- AEE2004.ev/CMM/V46_21: a címzés UDS-t ír, de az azonosítás (21FE) KWP-s és vannak lids/ adatok → KWP-PSA2000
+- AEE2004.ev/VTH/VTH: a címzés UDS-t ír, de az azonosítás (2180) KWP-s és vannak lids/ adatok → KWP-PSA2000 (a dids/ kimarad)
+- AEE2004.full/AAS/AAS: a címzés UDS-t ír, de az azonosítás (2180) KWP-s és vannak lids/ adatok → KWP-PSA2000 (a dids/ kimarad)
+- AEE2004.full/ABS/ABS81: a címzés UDS-t ír, de az azonosítás (2180) KWP-s és vannak lids/ adatok → KWP-PSA2000 (a dids/ kimarad)
+- AEE2004.full/ABS/ESP81: a címzés UDS-t ír, de az azonosítás (21FE) KWP-s és vannak lids/ adatok → KWP-PSA2000 (a dids/ kimarad)
+- AEE2004.full/AFS/AFS: a címzés UDS-t ír, de az azonosítás (2180) KWP-s és vannak lids/ adatok → KWP-PSA2000
+- AEE2004.full/CLIM_AV/CLIMATE_AUTO: a címzés UDS-t ír, de az azonosítás (2180) KWP-s és vannak lids/ adatok → KWP-PSA2000
+- AEE2004.full/CMM/DCM35_BR2: a címzés UDS-t ír, de az azonosítás (21FE) KWP-s és vannak lids/ adatok → KWP-PSA2000
+- AEE2004.full/CMM/ME745: a címzés UDS-t ír, de az azonosítás (21FE) KWP-s és vannak lids/ adatok → KWP-PSA2000
+- AEE2004.full/CMM/MM6KP: a címzés UDS-t ír, de az azonosítás (21FE) KWP-s és vannak lids/ adatok → KWP-PSA2000
+- AEE2004.full/EMF/EMF_A: a címzés UDS-t ír, de az azonosítás (2180) KWP-s és vannak lids/ adatok → KWP-PSA2000 (a dids/ kimarad)
+- AEE2004.full/EMF/EMF_C: a címzés UDS-t ír, de az azonosítás (2180) KWP-s és vannak lids/ adatok → KWP-PSA2000 (a dids/ kimarad)
+- AEE2004.full/KML/KML: a címzés UDS-t ír, de az azonosítás (2180) KWP-s és vannak lids/ adatok → KWP-PSA2000
+- AEE2004.full/RBG/SAC_AUTOLIV: a címzés UDS-t ír, de az azonosítás (2180) KWP-s és vannak lids/ adatok → KWP-PSA2000 (a dids/ kimarad)
+- AEE2010.eco/CMM/V46_6: a címzés UDS-t ír, de az azonosítás (21FE) KWP-s és vannak lids/ adatok → KWP-PSA2000
+- AEE2010.ev/CMM/EDC17C10_BR2: a címzés UDS-t ír, de az azonosítás (21FE) KWP-s és vannak lids/ adatok → KWP-PSA2000
+- AEE2010.full/CMM/ME745_EC5: a címzés UDS-t ír, de az azonosítás (21FE) KWP-s és vannak lids/ adatok → KWP-PSA2000
+- AEE2010.full/CMM/MED17_4_2: a címzés UDS-t ír, de az azonosítás (21FE) KWP-s és vannak lids/ adatok → KWP-PSA2000
+- AEE2010.full/CMM/MEVD17_4_2: a címzés UDS-t ír, de az azonosítás (21FE) KWP-s és vannak lids/ adatok → KWP-PSA2000
+- AEE2010.full/CMM/V46_32: a címzés UDS-t ír, de az azonosítás (21FE) KWP-s és vannak lids/ adatok → KWP-PSA2000
+- AEE2010.full/CMM/V46_52: a címzés UDS-t ír, de az azonosítás (21FE) KWP-s és vannak lids/ adatok → KWP-PSA2000
+- FIAT.full/RBG/SAC_TRW: a címzés UDS-t ír, de az azonosítás (1A87) KWP-s és vannak lids/ adatok → KWP-PSA2000
+- MMC.full/AAS/AAS_MMC: a címzés UDS-t ír, de az azonosítás (1A87) KWP-s és vannak lids/ adatok → KWP-PSA2000
+- MMC.full/ABS/ABS: a címzés UDS-t ír, de az azonosítás (1A87) KWP-s és vannak lids/ adatok → KWP-PSA2000
+- MMC.full/ABS/ABS_4X4: a címzés UDS-t ír, de az azonosítás (1A87) KWP-s és vannak lids/ adatok → KWP-PSA2000
+- MMC.full/ABS/ESP: a címzés UDS-t ír, de az azonosítás (1A87) KWP-s és vannak lids/ adatok → KWP-PSA2000
+- MMC.full/ABS/ESP_4X4: a címzés UDS-t ír, de az azonosítás (1A87) KWP-s és vannak lids/ adatok → KWP-PSA2000
+- MMC.full/AFS/CORPRO: a címzés UDS-t ír, de az azonosítás (1A87) KWP-s és vannak lids/ adatok → KWP-PSA2000
+- MMC.full/AFS/CORPRO_I3I4: a címzés UDS-t ír, de az azonosítás (1A87) KWP-s és vannak lids/ adatok → KWP-PSA2000
+- MMC.full/AWD/TRANSMISSION: a címzés UDS-t ír, de az azonosítás (1A87) KWP-s és vannak lids/ adatok → KWP-PSA2000
+- MMC.full/BML/KOS: a címzés UDS-t ír, de az azonosítás (1A87) KWP-s és vannak lids/ adatok → KWP-PSA2000
+- MMC.full/BML/WCM: a címzés UDS-t ír, de az azonosítás (1A87) KWP-s és vannak lids/ adatok → KWP-PSA2000
+- MMC.full/BSI/ETACS_SUV: a címzés UDS-t ír, de az azonosítás (1A87) KWP-s és vannak lids/ adatok → KWP-PSA2000
+- MMC.full/BVA/BV_CVT: a címzés UDS-t ír, de az azonosítás (1A87) KWP-s és vannak lids/ adatok → KWP-PSA2000
+- MMC.full/CAV/CAV: a címzés UDS-t ír, de az azonosítás (1A87) KWP-s és vannak lids/ adatok → KWP-PSA2000
+- MMC.full/CAV/SAS: a címzés UDS-t ír, de az azonosítás (1A87) KWP-s és vannak lids/ adatok → KWP-PSA2000
+- MMC.full/CMB/HEADLAMP_LEVELLING: a címzés UDS-t ír, de az azonosítás (1A87) KWP-s és vannak lids/ adatok → KWP-PSA2000
+- MMC.full/DAE/EPS: a címzés UDS-t ír, de az azonosítás (1A87) KWP-s és vannak lids/ adatok → KWP-PSA2000
+- MMC.full/DAE/EPS_M: a címzés UDS-t ír, de az azonosítás (1A87) KWP-s és vannak lids/ adatok → KWP-PSA2000
+- MMC.full/OBC/OBC_DCDC: a címzés UDS-t ír, de az azonosítás (1A87) KWP-s és vannak lids/ adatok → KWP-PSA2000
+- MMC.full/STT/STT_MMC: a címzés UDS-t ír, de az azonosítás (1A87) KWP-s és vannak lids/ adatok → KWP-PSA2000
+- MMC.full/TBMU/BMU: a címzés UDS-t ír, de az azonosítás (1A9C) KWP-s és vannak lids/ adatok → KWP-PSA2000
 
 ## Hibás definíciók (4) – nem kerültek be
 

@@ -21,6 +21,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.DeleteSweep
+import androidx.compose.material.icons.outlined.ReportProblem
 import androidx.compose.material.icons.outlined.HelpOutline
 import androidx.compose.material.icons.outlined.Memory
 import androidx.compose.material.icons.outlined.Search
@@ -88,6 +90,45 @@ class MfrViewModel(val c: AppContainer) : ViewModel() {
 
     fun identify() = viewModelScope.launch { c.mfr.identify() }
 
+    /** Vezérlőnként a kiolvasott gyártói hibakódok (vagy hibaüzenet). */
+    val dtcs = mutableStateMapOf<String, hu.obddiag.core.mfr.MfrDtcResult>()
+    var dtcBusy by mutableStateOf<String?>(null)
+        private set
+    var dtcMessage = mutableStateMapOf<String, String>()
+
+    fun readDtcs(list: List<MfrDetection.Identified>) {
+        if (dtcBusy != null || list.isEmpty()) return
+        viewModelScope.launch {
+            for (d in list) {
+                dtcBusy = d.ecu.key
+                dtcMessage.remove(d.ecu.key)
+                dtcs[d.ecu.key] = try { c.connection.readManufacturerDtcs(d.ecu) } catch (e: Exception) {
+                    hu.obddiag.core.mfr.MfrDtcResult.Failed(e.message ?: e.javaClass.simpleName)
+                }
+            }
+            dtcBusy = null
+        }
+    }
+
+    fun clearDtcs(d: MfrDetection.Identified, okText: String, failFmt: String) {
+        if (dtcBusy != null) return
+        dtcBusy = d.ecu.key
+        viewModelScope.launch {
+            val r = try { c.connection.clearManufacturerDtcs(d.ecu) } catch (e: Exception) { MfrReadResult.Failed(e.message ?: "hiba") }
+            dtcMessage[d.ecu.key] = when (r) {
+                is MfrReadResult.Ok -> okText
+                is MfrReadResult.Negative -> failFmt.format("NRC 0x%02X".format(r.nrc))
+                MfrReadResult.NoResponse -> failFmt.format("nincs válasz")
+                is MfrReadResult.Failed -> failFmt.format(r.reason)
+            }
+            if (r is MfrReadResult.Ok) kotlinx.coroutines.delay(1_500)
+            dtcs[d.ecu.key] = try { c.connection.readManufacturerDtcs(d.ecu) } catch (e: Exception) {
+                hu.obddiag.core.mfr.MfrDtcResult.Failed(e.message ?: e.javaClass.simpleName)
+            }
+            dtcBusy = null
+        }
+    }
+
     /** Megosztható azonosítási jelentés: címenként a nyers válaszok és a kiolvasott cikkszámok. */
     fun report(r: hu.obddiag.core.mfr.MfrIdentification): String = buildString {
         val conn = c.connection.state.value as? ConnectionState.Connected
@@ -110,6 +151,22 @@ class MfrViewModel(val c: AppContainer) : ViewModel() {
                 is MfrDetection.Unknown -> append("ISMERETLEN cikkszám(ok)=${d.partNumbers.joinToString().ifEmpty { "–" }} (${d.nodes.joinToString()})")
             }
             append('\n')
+        }
+        if (dtcs.isNotEmpty()) {
+            append("\n== Gyártói hibakódok ==\n")
+            for ((k, v) in dtcs) {
+                append(k).append(": ")
+                when (v) {
+                    is hu.obddiag.core.mfr.MfrDtcResult.Ok -> append(v.dtcs.joinToString { "${it.code}${it.failureType?.let { f -> "-%02X".format(f) } ?: ""} (0x%02X)".format(it.status) }.ifEmpty { "nincs" })
+                    else -> append(v.toString())
+                }
+                append('\n')
+            }
+        }
+        val log = c.connection.mfrReadLog
+        if (log.isNotEmpty()) {
+            append("\n== Gyártói olvasások (utolsó ").append(log.size).append(") ==\n")
+            log.forEach { append(it).append('\n') }
         }
         append("\n== Részletek (").append(r.probedAddresses).append(" cím) ==\n")
         r.trace.forEach { append(it).append('\n') }
@@ -206,6 +263,13 @@ fun MfrScreen(nav: NavController) {
                             }, modifier = Modifier.fillMaxWidth()) {
                                 Icon(Icons.Outlined.Share, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.mfr_share_report))
                             }
+                            if (r.identified.isNotEmpty()) {
+                                Spacer(Modifier.height(8.dp))
+                                OutlinedButton(onClick = { vm.readDtcs(r.identified) }, enabled = vm.dtcBusy == null, modifier = Modifier.fillMaxWidth()) {
+                                    if (vm.dtcBusy != null) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp) else Icon(Icons.Outlined.ReportProblem, null)
+                                    Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.mfr_dtc_read_all))
+                                }
+                            }
                             val live = registry?.signals?.count { it.isLive } ?: 0
                             if (live > 0) {
                                 Spacer(Modifier.height(8.dp))
@@ -225,6 +289,67 @@ fun MfrScreen(nav: NavController) {
                 MfrState.Idle -> Unit
             }
         }
+    }
+}
+
+@Composable
+private fun DtcSection(d: MfrDetection.Identified, vm: MfrViewModel) {
+    var confirm by remember { mutableStateOf(false) }
+    val busy = vm.dtcBusy == d.ecu.key
+    val okText = stringResource(R.string.mfr_dtc_cleared)
+    val failFmt = stringResource(R.string.mfr_dtc_clear_failed)
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedButton(onClick = { vm.readDtcs(listOf(d)) }, enabled = vm.dtcBusy == null, modifier = Modifier.weight(1f)) {
+            if (busy) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp) else Icon(Icons.Outlined.ReportProblem, null)
+            Spacer(Modifier.width(6.dp)); Text(stringResource(R.string.mfr_dtc_read))
+        }
+        OutlinedButton(onClick = { confirm = true }, enabled = vm.dtcBusy == null, modifier = Modifier.weight(1f),
+            colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(contentColor = AppTheme.status.danger)) {
+            Icon(Icons.Outlined.DeleteSweep, null); Spacer(Modifier.width(6.dp)); Text(stringResource(R.string.mfr_dtc_clear))
+        }
+    }
+    vm.dtcMessage[d.ecu.key]?.let { Text(it, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 6.dp)) }
+    when (val res = vm.dtcs[d.ecu.key]) {
+        null -> Unit
+        is hu.obddiag.core.mfr.MfrDtcResult.Ok -> Column(Modifier.padding(top = 6.dp)) {
+            if (res.dtcs.isEmpty()) Text(stringResource(R.string.mfr_dtc_none), style = MaterialTheme.typography.bodySmall, color = AppTheme.status.ok)
+            else Text(stringResource(R.string.mfr_dtc_count, res.dtcs.size), style = MaterialTheme.typography.labelLarge)
+            val lang = MfrSignals.language
+            res.dtcs.forEach { dtc ->
+                val info = d.ecu.dtcInfo[dtc.raw]
+                val status = when {
+                    dtc.activeNow == true -> stringResource(R.string.mfr_dtc_status_active)
+                    dtc.confirmed == true -> stringResource(R.string.mfr_dtc_status_stored)
+                    else -> stringResource(R.string.mfr_dtc_status_raw, dtc.status)
+                }
+                Column(Modifier.padding(top = 6.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(dtc.code + (dtc.failureType?.let { "-%02X".format(it) } ?: ""), style = ValueText.mono, fontWeight = FontWeight.SemiBold)
+                        Spacer(Modifier.width(8.dp))
+                        StatusPill(status, if (dtc.activeNow == true) AppTheme.status.danger else AppTheme.status.warning)
+                    }
+                    Text(info?.text?.get(lang) ?: stringResource(R.string.mfr_dtc_unknown_text), style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+        is hu.obddiag.core.mfr.MfrDtcResult.Negative -> Text(stringResource(R.string.mfr_dtc_nrc, res.nrc), style = MaterialTheme.typography.bodySmall, color = AppTheme.status.warning)
+        hu.obddiag.core.mfr.MfrDtcResult.NoResponse -> Text(stringResource(R.string.mfr_dtc_no_response), style = MaterialTheme.typography.bodySmall, color = AppTheme.status.warning)
+        is hu.obddiag.core.mfr.MfrDtcResult.Failed -> Text(res.reason, style = MaterialTheme.typography.bodySmall, color = AppTheme.status.warning)
+    }
+    if (confirm) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { confirm = false },
+            icon = { Icon(Icons.Outlined.WarningAmber, null, tint = AppTheme.status.warning) },
+            title = { Text(stringResource(R.string.mfr_dtc_clear_title, nodeName(d.ecu.node))) },
+            text = { Text(stringResource(R.string.mfr_dtc_clear_text)) },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = { confirm = false; vm.clearDtcs(d, okText, failFmt) }) {
+                    Text(stringResource(R.string.mfr_dtc_clear), color = AppTheme.status.danger)
+                }
+            },
+            dismissButton = { androidx.compose.material3.TextButton(onClick = { confirm = false }) { Text(stringResource(R.string.cancel)) } }
+        )
     }
 }
 
@@ -260,6 +385,12 @@ private fun DetectionCard(d: MfrDetection, registry: MfrRegistry?, vm: MfrViewMo
                 InfoRow(stringResource(R.string.mfr_protocol), if (d.ecu.readService == 0x22) "UDS (ISO 14229)" else "KWP2000 (PSA, CAN)")
                 val sigs = registry?.signals?.filter { it.ecu === d.ecu }.orEmpty()
                 InfoRow(stringResource(R.string.mfr_values), stringResource(R.string.mfr_values_count, sigs.count { it.isLive }, sigs.count { !it.isLive }))
+                if (d.ecu.safetyCritical) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(stringResource(R.string.mfr_safety_note), style = MaterialTheme.typography.bodySmall, color = AppTheme.status.warning)
+                }
+                Spacer(Modifier.height(8.dp))
+                DtcSection(d, vm)
                 Spacer(Modifier.height(8.dp))
                 val loading = vm.staticLoading == d.ecu.key
                 OutlinedButton(onClick = { expanded = true; vm.readStatic(d, unsupportedFmt) }, enabled = vm.staticLoading == null, modifier = Modifier.fillMaxWidth()) {

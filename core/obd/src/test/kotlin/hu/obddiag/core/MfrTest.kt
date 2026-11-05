@@ -176,7 +176,8 @@ class MfrTest {
     }
 
     /** Előre megírt ELM-válaszok (CAN 11 bit, fejlécekkel). */
-    private class ScriptTransport(private val answers: Map<String, String>) : hu.obddiag.core.transport.ObdTransport {
+    private class ScriptTransport(private val answers: Map<String, String>,
+                                  private val dyn: ((String, List<String>) -> String?)? = null) : hu.obddiag.core.transport.ObdTransport {
         override val type = hu.obddiag.core.transport.TransportType.WIFI
         override val description = "script"
         override var isConnected = false
@@ -187,7 +188,7 @@ class MfrTest {
         override suspend fun close() { isConnected = false }
         override suspend fun write(data: ByteArray) {
             val cmd = String(data).trim(); sent += cmd
-            val a = answers[cmd] ?: if (cmd.startsWith("AT")) "OK" else "NO DATA"
+            val a = dyn?.invoke(cmd, sent) ?: answers[cmd] ?: if (cmd.startsWith("AT")) "OK" else "NO DATA"
             ch.trySend("$a\r\r>".toByteArray())
         }
     }
@@ -339,5 +340,78 @@ class MfrTest {
         val feItem = d.ecu.items.first { it.id == 0xFE }
         val payload = fe.drop(2).map { it.toByte() }.toByteArray()
         for (p in feItem.paramsFor(d.variant)!!) MfrDecoder.decode(p, payload)
+    }
+
+    private suspend fun fieldClient(t: ScriptTransport): ObdClient { t.connect(); return ObdClient(ElmSession(t)).apply { connectVehicle() } }
+
+    /** Terepi jelentés: az ESP81 (ABS) 21 FE-re válaszol, a 22-es szolgáltatásra 7F 22 11 → KWP-ként kell kezelni. */
+    @Test
+    fun fieldReportEsp81IsKwpAndNeverPolled() = runBlocking {
+        val db = realDb()
+        fun bytesOf(h: String) = h.split(" ").map { it.toInt(16) }
+        val fe = listOf(0x61, 0xFE) + bytesOf("00 00 00 00 03 7E 1B 0A 0A 01 03 0B 08 0B 09 0C FD B7 33 0C 02 79 10 62")
+        val t = ScriptTransport(mapOf("0100" to "7E8 06 41 00 BE 3F A8 13", "ATDPN" to "A6", "81" to "68D 03 C1 D0 8F",
+            "21FE" to isoTp("68D", fe), "22F0FE" to "68D 03 7F 22 11", "82" to "68D 01 C2"))
+        val c = fieldClient(t)
+        val only = MfrDatabase(db.source, db.brand, db.ecus.filter { it.requestId == 0x6AD }, emptyMap())
+        val session = MfrSession(c)
+        val res = MfrIdentifier(only, session).identify()
+        val d = res.identified.single()
+        assertEquals("AEE2004.full/ABS/ESP81", d.ecu.key)
+        assertEquals(hu.obddiag.core.mfr.MfrProtocol.KWP_PSA, d.ecu.protocol)
+        assertTrue(d.ecu.safetyCritical)
+        val reg = MfrRegistry(res, db.source)
+        assertTrue(reg.signals.isNotEmpty())
+        assertEquals(0, reg.signals.count { it.isLive })
+        // a fékvezérlő élő lekérdezése tiltott: a terv üres akkor is, ha valaki kéri
+        assertTrue(reg.plan(reg.signals.map { it.id }).isEmpty())
+        // a megnyitott session a végén szabályosan lezárható
+        session.exclusive { closeSessions() }
+        assertTrue("82" in t.sent)
+    }
+
+    @Test
+    fun dtcParsing() {
+        val kwp = MfrSession.parseDtcs(listOf(0x57, 0x02, 0x05, 0x62, 0xA0, 0x53, 0x15, 0x20), uds = false)
+        assertEquals(listOf("P0562", "C1315"), kwp.map { it.code })
+        assertEquals(0xA0, kwp[0].status)
+        val uds = MfrSession.parseDtcs(listOf(0x59, 0x02, 0xFF, 0x05, 0x62, 0x16, 0x09, 0xD1, 0x18, 0x00, 0x08, 0x00, 0x00, 0x00, 0x00), uds = true)
+        assertEquals(listOf("P0562", "U1118"), uds.map { it.code })
+        assertEquals(true, uds[0].activeNow); assertEquals(true, uds[0].confirmed); assertEquals(false, uds[1].activeNow)
+    }
+
+    @Test
+    fun dtcClearOnlyThroughExplicitApi() = runBlocking {
+        val db = realDb()
+        val ecu = db.ecus.first { it.key == "AEE2010.full/CMM/MED17_4_2" }
+        val t = ScriptTransport(mapOf("0100" to "7E8 06 41 00 BE 3F A8 13", "ATDPN" to "A6", "81" to "688 03 C1 D0 8F",
+            "17FF00" to "688 05 57 01 05 62 A0", "14FF00" to "688 03 54 FF 00", "82" to "688 01 C2"))
+        val session = MfrSession(fieldClient(t))
+        session.exclusive {
+            select(ecu)
+            try { send(ecu, "14FF00"); org.junit.Assert.fail("a törlés nem mehet át az általános küldésen") } catch (_: hu.obddiag.core.mfr.MfrSafetyException) { }
+            val r = readDtcs(ecu) as hu.obddiag.core.mfr.MfrDtcResult.Ok
+            assertEquals("P0562", r.dtcs.single().code)
+            assertTrue(ecu.dtcInfo[0x0562] != null)
+            assertTrue(clearDtcs(ecu) is hu.obddiag.core.mfr.MfrReadResult.Ok)
+        }
+        assertTrue("14FF00" in t.sent)
+    }
+
+    /** Ha a vezérlő a megszokott (rövid) időzítéssel nem válaszol, hosszabb várakozással újrapróbálunk. */
+    @Test
+    fun slowEcuGetsLongerTimeout() = runBlocking {
+        val db = realDb()
+        val ecu = db.ecus.first { it.key == "AEE2010.full/CMM/MED17_4_2" }
+        val payload = listOf(0x61, 0xCB) + List(45) { 0x10 }
+        val t = ScriptTransport(mapOf("0100" to "7E8 06 41 00 BE 3F A8 13", "ATDPN" to "A6", "81" to "688 03 C1 D0 8F")) { cmd, sent ->
+            if (cmd == "21CB") { if (sent.lastIndexOf("ATAT0") > sent.lastIndexOf("ATAT1")) isoTp("688", payload) else "NO DATA" } else null
+        }
+        val session = MfrSession(fieldClient(t))
+        val r = session.exclusive { select(ecu); read(ecu, "21CB") }
+        assertTrue(r is hu.obddiag.core.mfr.MfrReadResult.Ok)
+        assertTrue("ATST${MfrSession.SLOW_TIMEOUT_HEX}" in t.sent)
+        // a végén a szabványos időzítés visszaáll
+        assertEquals("ATAT1", t.sent.last { it.startsWith("ATAT") })
     }
 }

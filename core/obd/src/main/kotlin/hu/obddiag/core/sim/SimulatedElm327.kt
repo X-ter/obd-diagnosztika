@@ -370,9 +370,15 @@ class SimulatedElm327(
                 if (data == null) listOf(0x7F, 0x22, 0x31) else listOf(0x62, b[1], b[2]) + data
             }
             0x3E -> listOf(0x7E, 0x00)
+            // gyártói hibakódok: egy szimulált tárolt kód (P0562 – alacsony tápfeszültség), amíg nem törlik
+            0x19 -> if (b.getOrNull(1) == 0x02) listOf(0x59, 0x02, 0xFF) + (if (psaDtcStored) listOf(0x05, 0x62, 0x16, 0x08) else emptyList())
+                    else listOf(0x7F, 0x19, 0x12)
+            0x14 -> { psaDtcStored = false; listOf(0x54) }
             else -> listOf(0x7F, b[0], 0x11)
         }
     }
+
+    @Volatile private var psaDtcStored = true
 
     companion object {
         const val PSA_ENGINE_RQ = "6A8"

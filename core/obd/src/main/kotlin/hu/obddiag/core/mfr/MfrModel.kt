@@ -72,14 +72,24 @@ class MfrEcu(
     /** szoftverváltozat → cikkszámok */
     val variants: Map<String, List<String>>,
     val ambiguousParts: Set<String>,
-    /** Az azonosítók csak akkor töltődnek be, ha a vezérlőt azonosítottuk (memóriatakarékosság). */
-    private val itemsLoader: () -> List<MfrItem>
+    /** Az azonosítók és a hibakód-leírások csak akkor töltődnek be, ha a vezérlőt azonosítottuk (memóriatakarékosság). */
+    private val dataLoader: () -> MfrEcuData
 ) {
     constructor(key: String, node: String, model: String, label: MfrText?, protocol: MfrProtocol, requestId: Int, responseId: Int,
-                ident: MfrIdentRequest, variants: Map<String, List<String>>, ambiguousParts: Set<String>, items: List<MfrItem>) :
-        this(key, node, model, label, protocol, requestId, responseId, ident, variants, ambiguousParts, { items })
+                ident: MfrIdentRequest, variants: Map<String, List<String>>, ambiguousParts: Set<String>, items: List<MfrItem>,
+                dtcs: Map<Int, MfrDtcInfo> = emptyMap()) :
+        this(key, node, model, label, protocol, requestId, responseId, ident, variants, ambiguousParts, { MfrEcuData(items, dtcs) })
 
-    val items: List<MfrItem> by lazy(itemsLoader)
+    private val data: MfrEcuData by lazy(dataLoader)
+    val items: List<MfrItem> get() = data.items
+    /** Gyártói hibakódok leírása: nyers 2 bájtos kód → szöveg. */
+    val dtcInfo: Map<Int, MfrDtcInfo> get() = data.dtcs
+
+    /**
+     * Biztonságkritikus vezérlő (fék, kormány, légzsák, váltó, hajtás…): folyamatos lekérdezés nincs,
+     * csak egyszeri, kifejezett felhasználói kérésre olvasunk belőle.
+     */
+    val safetyCritical: Boolean get() = node.uppercase() in SAFETY_CRITICAL_NODES
 
     val readService: Int get() = if (protocol == MfrProtocol.UDS) 0x22 else 0x21
 
@@ -89,6 +99,16 @@ class MfrEcu(
     /** Motor-, futómű-oldali (0x6xx) vagy utastér-oldali (0x7xx) vezérlő – a KWP-session indítása ettől függ. */
     val isPowertrain: Boolean get() = requestId in 0x600..0x6FF
 }
+
+class MfrEcuData(val items: List<MfrItem>, val dtcs: Map<Int, MfrDtcInfo>)
+
+/** Egy gyártói hibakód leírása (PSA-RE dtcs.yml). */
+class MfrDtcInfo(val code: String?, val text: MfrText)
+
+val SAFETY_CRITICAL_NODES = setOf(
+    "ABS", "ASR", "ESP", "DAE", "FSE", "EBB", "SBW", "RBG", "AIRBAG", "BVA", "BVM", "AWD", "ARTIV",
+    "AIR_SUSPENSION", "AMVAR", "VCU", "HCU1", "HCU2", "CDPL"
+)
 
 class MfrSource(val name: String, val url: String, val commit: String, val license: String)
 
@@ -138,7 +158,21 @@ class MfrDatabase(val source: MfrSource, val brand: String, val ecus: List<MfrEc
         }
 
         /** 1-es formátum: egyetlen JSON, minden adattal (tesztekhez, kis adatbázisokhoz). */
-        fun fromJson(json: String): MfrDatabase = build(MiniJson.parse(json)) { e, _ -> { parseItems(e["data"]) } }
+        @Suppress("UNCHECKED_CAST")
+        fun parseDtcs(o: Any?): Map<Int, MfrDtcInfo> = (o as? Map<String, Any?>).orEmpty().mapNotNull { (raw, v) ->
+            val m = v as? Map<String, Any?> ?: return@mapNotNull null
+            val code = m["c"] as? String
+            val t = text(m.filterKeys { it != "c" }) ?: return@mapNotNull null
+            raw.toIntOrNull(16)?.let { it to MfrDtcInfo(code, t) }
+        }.toMap()
+
+        @Suppress("UNCHECKED_CAST")
+        private fun parseChunk(o: Any?): MfrEcuData =
+            if (o is Map<*, *>) MfrEcuData(parseItems((o as Map<String, Any?>)["d"]), parseDtcs(o["t"]))
+            else MfrEcuData(parseItems(o), emptyMap())
+
+        /** 1-es formátum: egyetlen JSON, minden adattal (tesztekhez, kis adatbázisokhoz). */
+        fun fromJson(json: String): MfrDatabase = build(MiniJson.parse(json)) { e, _ -> { MfrEcuData(parseItems(e["data"]), parseDtcs(e["dtcs"])) } }
 
         /**
          * 2-es formátum (soronként tagolt): az első sor a fejléc (címzés, azonosítás, változatok), a további sorok
@@ -148,7 +182,7 @@ class MfrDatabase(val source: MfrSource, val brand: String, val ecus: List<MfrEc
         fun fromLines(lineAt: (Int) -> String): MfrDatabase =
             build(MiniJson.parse(lineAt(0))) { e, _ ->
                 val chunk = (e["chunk"] as Number).toInt()
-                ({ parseItems(MiniJson.parse(lineAt(chunk + 1))) })
+                ({ parseChunk(MiniJson.parse(lineAt(chunk + 1))) })
             }
 
         /** Segédfüggvény: az n-edik sor kiolvasása egy (újra megnyitható) szövegfolyamból, majd lezárás. */
@@ -158,7 +192,7 @@ class MfrDatabase(val source: MfrSource, val brand: String, val ecus: List<MfrEc
         }
 
         @Suppress("UNCHECKED_CAST")
-        private fun build(rootAny: Any?, loader: (Map<String, Any?>, Int) -> () -> List<MfrItem>): MfrDatabase {
+        private fun build(rootAny: Any?, loader: (Map<String, Any?>, Int) -> () -> MfrEcuData): MfrDatabase {
             val root = rootAny as Map<String, Any?>
             val fmt = (root["format"] as? Number)?.toInt()
             require(fmt == 1 || fmt == 2) { "Ismeretlen adatbázis-formátum" }
@@ -176,7 +210,7 @@ class MfrDatabase(val source: MfrSource, val brand: String, val ecus: List<MfrEc
                     ident = MfrIdentRequest(id["req"] as String, (id["byte"] as Number).toInt(), (id["len"] as Number).toInt()),
                     variants = (e["variants"] as Map<String, Any?>).mapValues { (_, v) -> (v as List<Any?>).map { it.toString() } },
                     ambiguousParts = (e["ambiguousParts"] as List<Any?>?)?.map { it.toString() }?.toSet().orEmpty(),
-                    itemsLoader = loader(e, idx)
+                    dataLoader = loader(e, idx)
                 )
             }
             return MfrDatabase(

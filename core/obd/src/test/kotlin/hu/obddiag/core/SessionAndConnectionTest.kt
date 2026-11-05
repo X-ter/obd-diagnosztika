@@ -209,7 +209,7 @@ class SessionAndConnectionTest {
             poller.samples.collect { list -> list.forEach { s -> hu.obddiag.core.pid.StandardPids.pidOfSignal(s.signalId)?.let { seen += it.pid } } }
         }
         val job = launch(Dispatchers.Default) { poller.run() }
-        withTimeout(5_000) { while (!seen.containsAll(wanted)) delay(50) }
+        withTimeout(15_000) { while (!seen.containsAll(wanted)) delay(50) }
         job.cancel(); collector.cancel()
         assertTrue(poller.health.value.values.none { it == PidHealth.NOT_SUPPORTED })
     }

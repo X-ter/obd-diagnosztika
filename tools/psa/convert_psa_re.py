@@ -195,8 +195,12 @@ def main():
         has_dids = bool(glob.glob(f"{d}/dids/*.yml"))
         has_lids = bool(glob.glob(f"{d}/lids/*.yml"))
         ident_kwp = ident["req"].startswith(("21", "1A"))
-        if proto == "UDS" and ident_kwp and has_lids and not has_dids:
-            proto_fixes.append(f"{rel}: a címzés UDS-t ír, de az azonosítás ({ident['req']}) és az adatok (lids/) KWP-sek → KWP-PSA2000")
+        # Ha az azonosítás KWP-kéréssel (21 xx / 1A xx) történik és vannak lids/ adatok, a vezérlő KWP-t beszél:
+        # a terepi teszt szerint pl. az ESP81 (címzés: „UDS”, dids/ ÉS lids/ is van) a 22-es szolgáltatásra
+        # 7F 22 11-et (nem támogatott szolgáltatás) válaszol, a 21-esre viszont igen.
+        if proto == "UDS" and ident_kwp and has_lids:
+            proto_fixes.append(f"{rel}: a címzés UDS-t ír, de az azonosítás ({ident['req']}) KWP-s és vannak lids/ adatok → KWP-PSA2000"
+                               + (" (a dids/ kimarad)" if has_dids else ""))
             proto = "KWP-PSA2000"
         elif proto == "KWP-PSA2000" and ident["req"].startswith("22") and has_dids and not has_lids:
             proto_fixes.append(f"{rel}: a címzés KWP-t ír, de az azonosítás ({ident['req']}) és az adatok (dids/) UDS-esek → UDS")
@@ -249,11 +253,22 @@ def main():
         if not data:
             skipped["nincs olvasható adat"] += 1
             continue
+        # Gyártói hibakódok leírása (dtcs.yml): nyers 2 bájtos kód (hex) → szöveg
+        dtcs = {}
+        dtc_file = f"{d}/dtcs.yml"
+        if os.path.exists(dtc_file):
+            for code, dv in (yaml.safe_load(open(dtc_file, encoding="utf-8")) or {}).items():
+                if not isinstance(dv, dict) or not dv.get("raw"):
+                    continue
+                raw = str(dv["raw"]).upper().zfill(4)
+                t = text(dv.get("display_name"))
+                if t:
+                    dtcs[raw] = {"c": str(code), **t} if str(code) else t
         key = rel.replace(os.sep, "/")
         e = {
             "key": key, "node": y.get("node"), "model": y.get("model", y.get("node")),
             "proto": proto, "rq": addr["request_id"], "rs": addr["response_id"],
-            "ident": ident, "variants": variants, "cars": sorted(cars), "data": data,
+            "ident": ident, "variants": variants, "cars": sorted(cars), "data": data, "dtcs": dtcs,
         }
         dn = text(y.get("display_name"))
         if dn:
@@ -287,14 +302,16 @@ def main():
     # 2-es formátum: 1. sor = fejléc (adatok nélkül), utána vezérlőnként egy sor az azonosítókkal.
     # Így a telefon csak a fejlécet tartja memóriában, a vezérlő adatait azonosítás után tölti be.
     dumps = lambda o: json.dumps(o, ensure_ascii=False, separators=(",", ":"))
-    header = dict(out, ecus=[dict({k: v for k, v in e.items() if k != "data"}, chunk=i) for i, e in enumerate(ecus)])
-    raw = (dumps(header) + "\n" + "".join(dumps(e["data"]) + "\n" for e in ecus)).encode("utf-8")
+    header = dict(out, ecus=[dict({k: v for k, v in e.items() if k not in ("data", "dtcs")}, chunk=i) for i, e in enumerate(ecus)])
+    raw = (dumps(header) + "\n" + "".join(dumps({"d": e["data"], "t": e["dtcs"]}) + "\n" for e in ecus)).encode("utf-8")
     os.makedirs(os.path.dirname(os.path.abspath(a.out)), exist_ok=True)
     with gzip.open(a.out, "wb", compresslevel=9) as fh:
         fh.write(raw)
     print(f"fejléc: {len(dumps(header))/1e6:.2f} MB")
 
     n_items = sum(len(e["data"]) for e in ecus)
+    n_dtcs = sum(len(e["dtcs"]) for e in ecus)
+    print(f"gyártói hibakód-leírások: {n_dtcs}")
     n_params = sum(len(i["p"]) for e in ecus for i in e["data"])
     n_live = sum(1 for e in ecus for i in e["data"] if i["k"] == "live")
     summary = (f"PSA-RE {commit[:8]} | márka: {a.brand} | ECU-modellek: {len(ecus)} | azonosítók: {n_items} "

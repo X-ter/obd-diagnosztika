@@ -7,7 +7,8 @@ _lines = gzip.open(sys.argv[1], "rt", encoding="utf-8").read().splitlines()
 db = json.loads(_lines[0])
 if db.get("format") == 2:  # soronként tagolt: a vezérlők adatai külön sorokban
     for e in db["ecus"]:
-        e["data"] = json.loads(_lines[e["chunk"] + 1])
+        _c = json.loads(_lines[e["chunk"] + 1])
+        e["data"] = _c["d"] if isinstance(_c, dict) else _c
 by = collections.defaultdict(list)  # (rq, svc, id) -> [(modell, param)]
 for e in db["ecus"]:
     svc = 0x22 if e["proto"] == "UDS" else 0x21

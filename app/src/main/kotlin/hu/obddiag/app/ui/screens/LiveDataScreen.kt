@@ -249,7 +249,7 @@ fun LiveDataScreen(nav: NavController) {
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
                     Text(stringResource(R.string.live_monitored_count, monitored.size, items.size), style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
-                    TextButton(onClick = { vm.setMonitored(monitored + filtered.map { it.id }) }) { Text(stringResource(R.string.monitor_all)) }
+                    TextButton(onClick = { vm.setMonitored(monitored + filtered.filter { it.pid != MFR }.map { it.id }) }) { Text(stringResource(R.string.monitor_all)) }
                     TextButton(onClick = { vm.setMonitored(monitored - filtered.map { it.id }.toSet()) }) { Text(stringResource(R.string.monitor_none)) }
                 }
             }
