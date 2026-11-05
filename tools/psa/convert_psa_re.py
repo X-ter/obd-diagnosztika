@@ -182,7 +182,8 @@ def main():
         variants = {}
         for vid, v in (y.get("variants") or {}).items():
             if isinstance(v, dict):
-                parts = [str(p).upper() for p in (v.get("parts") or [])]
+                # csupa 0 / csupa F „cikkszám” kitöltés, nem azonosít semmit – kimarad
+                parts = [str(p).upper() for p in (v.get("parts") or []) if set(str(p).upper()) - {"0", "F"}]
                 if parts:
                     variants[str(vid)] = parts
         if ident is None or not variants:
@@ -294,6 +295,9 @@ def main():
 
     out = {
         "format": 2,
+        # Csak a diag/ (aktívan lekérdezhető UDS/KWP azonosítók) kerül be. A buses/ (DBMUXEv broadcast) passzív
+        # CAN-üzenetleírásai szándékosan kimaradnak: azok nem lekérdezhetők, és nem keverhetők a diagnosztikával.
+        "kind": "active-diagnostic",
         "source": {"name": "PSA-RE", "url": "https://github.com/prototux/PSA-RE", "commit": commit, "license": "Apache-2.0"},
         "brand": a.brand,
         "nodes": nodes,

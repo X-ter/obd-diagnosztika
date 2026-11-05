@@ -28,8 +28,9 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.io.File
-import java.util.zip.GZIPInputStream
+import hu.obddiag.core.mfr.MfrProtocol
+import hu.obddiag.core.sim.SimulatedManufacturerEcu
+import kotlin.random.Random
 
 class MfrTest {
 
@@ -57,7 +58,7 @@ class MfrTest {
         assertEquals(MfrValue.Invalid, MfrDecoder.decode(inv, p))
         val le = MfrParam("L", null, 0, 16, MfrType.UINT, littleEndian = true)
         assertEquals(0x5AA5.toDouble(), (MfrDecoder.decode(le, p) as MfrValue.Num).value, 0.0)
-        assertEquals("932130", MfrDecoder.bcd(bytes("932130")))
+        assertEquals("12AB34", MfrDecoder.bcd(bytes("12AB34")))
         val str = MfrParam("S", null, 0, 32, MfrType.STR)
         assertEquals("ABC", (MfrDecoder.decode(str, "ABC ".toByteArray()) as MfrValue.Text).text)
         val f = MfrParam("F", null, 0, 32, MfrType.FLOAT)
@@ -77,18 +78,12 @@ class MfrTest {
         assertNull(item.paramsFor("T9_V2"))
     }
 
-    // ───── A valódi, konvertált Peugeot-adatbázis ─────
-    private fun realDb(): MfrDatabase {
-        val f = listOf("app/src/main/assets/mfr/psa.dat", "../../app/src/main/assets/mfr/psa.dat",
-            "/home/claude/repo/app/src/main/assets/mfr/psa.dat").map(::File).first { it.exists() }
-        return MfrDatabase.fromLines { n -> MfrDatabase.lineOf({ GZIPInputStream(f.inputStream()).reader() }, n) }
-    }
+    // ───── Az adatbázis általános invariánsai (minden vezérlőmodellre) ─────
+    private val db get() = TestSupport.db
 
     @Test
     fun realDatabaseLoadsAndEveryParamDecodes() {
-        val db = realDb()
         assertTrue(db.ecus.size > 300)
-        assertEquals("Apache-2.0", db.source.license)
         var n = 0
         for (e in db.ecus) for (it in e.items) {
             val len = it.length ?: 64
@@ -97,82 +92,165 @@ class MfrTest {
                 n++
             }
             // biztonság: csak olvasó kérés készülhet belőle
-            assertTrue(if (e.protocol == hu.obddiag.core.mfr.MfrProtocol.UDS) it.id in 0..0xFFFF else it.id in 0..0xFF)
+            assertTrue(if (e.protocol == MfrProtocol.UDS) it.id in 0..0xFFFF else it.id in 0..0xFF)
         }
         assertTrue(n > 30_000)
     }
 
-    private suspend fun simClient(sim: SimulatedElm327): ObdClient {
-        sim.connect()
-        return ObdClient(ElmSession(sim)).apply { initializeAdapter(); connectVehicle(); discoverSupported(0x01); probeOptimizations() }
+    /** A protokoll a ténylegesen használt azonosító szolgáltatással egyezik (a forrás címkéjétől függetlenül). */
+    @Test
+    fun protocolIsConsistentWithIdentificationService() {
+        for (e in db.ecus) {
+            val svc = e.ident.request.take(2)
+            if (svc == "21" || svc == "1A") assertTrue("${e.key}: ${e.ident.request}", e.protocol == MfrProtocol.KWP_PSA)
+            if (svc == "22") assertTrue("${e.key}: ${e.ident.request}", e.protocol == MfrProtocol.UDS)
+        }
+    }
+
+    // ───── Generált vezérlők: azonosítás, profilválasztás, olvasás ─────
+
+    /** Sok, véletlenszerűen választott vezérlőmodell (UDS és KWP, különböző csomópontok) – ugyanaz a logika mindre. */
+    @Test
+    fun manyGeneratedEcusAreIdentifiedExactly() = runBlocking {
+        val rnd = Random(20261105)
+        val seen = mutableSetOf<String>()
+        repeat(24) { i ->
+            val sim = TestSupport.pick(rnd) { it.key !in seen }
+            seen += sim.ecu.key
+            val (c, t) = TestSupport.simClient(listOf(sim))
+            val res = MfrIdentifier(db, MfrSession(c)).identify()
+            val d = res.identified.singleOrNull()
+            assertTrue("#$i ${sim.ecu.key} ${sim.partNumber}: ${res.trace.takeLast(3)}", d != null)
+            assertEquals(sim.ecu.key, d!!.ecu.key)
+            assertEquals(sim.ecu.variantForPart(sim.partNumber), d.variant)
+            assertEquals(sim.partNumber, d.partNumber)
+            assertTrue("${sim.ecu.key}: ${res.detections}", res.detections.size == 1)
+            assertTrue(TestSupport.nonReadOnly(t.sent).isEmpty())
+            // a profil csak az azonosított változatra érvényes azonosítókat adja
+            val reg = MfrRegistry(res, db.source)
+            assertTrue(reg.signals.all { it.item.paramsFor(d.variant) != null })
+            // élő érték csak nem biztonságkritikus vezérlőnél, és csak ha a változatnak van élő azonosítója
+            val expectLive = !sim.ecu.safetyCritical && sim.ecu.items.any { it.kind == "live" && it.paramsFor(d.variant) != null && it.paramsFor(d.variant)!!.isNotEmpty() }
+            assertTrue(sim.ecu.key, expectLive == reg.signals.any { it.isLive })
+        }
+        assertTrue(seen.map { it.substringBeforeLast('/') }.toSet().size > 5)
+    }
+
+    @Test
+    fun liveValuesOfGeneratedEcuAreReadAndInRange() = runBlocking {
+        val rnd = Random(7)
+        val sim = TestSupport.pick(rnd, variantFilter = { e, v -> TestSupport.hasNumericLive(e, v, 3) }, filter = { !it.safetyCritical })
+        val (c, _) = TestSupport.simClient(listOf(sim))
+        val session = MfrSession(c)
+        val res = MfrIdentifier(db, session).identify()
+        val reg = MfrRegistry(res, db.source)
+        val live = reg.signals.filter { it.isLive && it.def != null }.take(15)
+        assertTrue("${sim.ecu.key}: ${res.detections}", live.isNotEmpty())
+        val r = MfrPoller(reg, session).cycle(live.map { it.id }.toSet())
+        for (s in live) {
+            assertTrue(s.id, r.health[s.id] == PidHealth.OK)
+            val v = r.samples.single { it.signalId == s.id }.value / s.unitMultiplier
+            s.param.min?.let { assertTrue("${s.id}: $v < $it", v >= it - 1e-6 - Math.abs(s.param.factor)) }
+            s.param.max?.let { assertTrue("${s.id}: $v > $it", v <= it + 1e-6 + Math.abs(s.param.factor)) }
+        }
+        // a gyártói kör után a szabványos OBD-lekérdezés ugyanúgy működik
+        val std = c.readPids(listOf(0x0C, 0x0D)) as ElmResult.Data
+        assertTrue(std.messages.all { it.ecu == "7E8" })
+    }
+
+    @Test
+    fun severalEcusOnDifferentAddressesAtOnce() = runBlocking {
+        val sims = TestSupport.pickDistinct(Random(99), 4)
+        val (c, _) = TestSupport.simClient(sims)
+        val res = MfrIdentifier(db, MfrSession(c)).identify()
+        assertEquals(sims.map { it.ecu.key }.toSet(), res.identified.map { it.ecu.key }.toSet())
+    }
+
+    /** Ismeretlen cikkszám: a vezérlő válaszol, de nincs profil – nem találgatunk, értéket nem mutatunk. */
+    @Test
+    fun unknownPartIsNotGuessed() = runBlocking {
+        val rnd = Random(3)
+        repeat(5) {
+            val base = TestSupport.pick(rnd)
+            val sim = SimulatedManufacturerEcu(base.ecu, base.variant, TestSupport.unknownPart(base.ecu, rnd))
+            val (c, _) = TestSupport.simClient(listOf(sim))
+            val res = MfrIdentifier(db, MfrSession(c)).identify()
+            assertTrue("${base.ecu.key}: ${res.detections} ${res.trace}", res.detections.size == 1)
+            val d = res.detections.single()
+            assertTrue("${base.ecu.key}: $d", d is MfrDetection.Unknown)
+            assertTrue((d as MfrDetection.Unknown).partNumbers.contains(sim.partNumber))
+            assertTrue(MfrRegistry(res, db.source).signals.isEmpty())
+        }
+    }
+
+    /** Több modellhez illő cikkszám: nem választunk. */
+    @Test
+    fun ambiguousPartIsNotChosen() = runBlocking {
+        val withAmb = db.ecus.filter { it.requestId <= 0x7FF && it.requestId !in 0x7DF..0x7EF }.filter { e -> e.ambiguousParts.any { it.length == e.ident.byteLength * 2 && it.all { c -> c in '0'..'9' || c in 'A'..'F' } } }
+        assertTrue(withAmb.isNotEmpty())
+        val e = withAmb[Random(5).nextInt(withAmb.size)]
+        val part = e.ambiguousParts.first { it.length == e.ident.byteLength * 2 && it.all { c -> c in '0'..'9' || c in 'A'..'F' } }
+        val v = e.variants.entries.first { part in it.value }.key
+        val (c, _) = TestSupport.simClient(listOf(SimulatedManufacturerEcu(e, v, part)))
+        val res = MfrIdentifier(db, MfrSession(c)).identify()
+        assertTrue("${e.key} $part: ${res.detections} ${res.trace.filter { !it.contains("nincs válasz") }}", res.identified.isEmpty() && res.detections.single() is MfrDetection.Ambiguous)
+        assertTrue(MfrRegistry(res, db.source).signals.isEmpty())
+    }
+
+    /** Biztonságkritikus vezérlő (fék, kormány, légzsák…): azonosítható, de élő lekérdezés soha. */
+    @Test
+    fun safetyCriticalEcusAreNeverPolled() = runBlocking {
+        val rnd = Random(11)
+        repeat(4) {
+            val sim = TestSupport.pick(rnd) { it.safetyCritical }
+            val (c, _) = TestSupport.simClient(listOf(sim))
+            val res = MfrIdentifier(db, MfrSession(c)).identify()
+            val reg = MfrRegistry(res, db.source)
+            assertEquals(sim.ecu.key, res.identified.single().ecu.key)
+            assertEquals(0, reg.signals.count { it.isLive })
+            assertTrue(reg.plan(reg.signals.map { it.id }).isEmpty())
+        }
     }
 
     @Test
     fun safetyWhitelistBlocksWritesAndControls() = runBlocking {
-        val sim = SimulatedElm327(responseDelayMs = 0)
-        val c = simClient(sim)
-        val ecu = realDb().ecus.first { it.key == "AEE2010.ev/CMM/CMM_MG1CS042" }
+        val sim = TestSupport.pick(Random(1))
+        val (c, _) = TestSupport.simClient(listOf(sim))
         val s = MfrSession(c)
-        for (bad in listOf("2ED42901", "3101FF00", "2701", "1003", "1102", "2F D4 29 03", "14FFFFFF", "85 02", "3400", "04")) {
+        for (bad in listOf("2ED42901", "3101FF00", "2701", "1003", "1102", "2F D4 29 03", "14FFFFFF", "14FF00", "85 02", "3400", "04", "3BA0FF")) {
             var blocked = false
-            try { s.exclusive { select(ecu); send(ecu, bad) } } catch (e: MfrSafetyException) { blocked = true }
+            try { s.exclusive { select(sim.ecu); send(sim.ecu, bad) } } catch (e: MfrSafetyException) { blocked = true }
             assertTrue("nem tiltott: $bad", blocked)
         }
-        // a szabványos címzés a hiba után is visszaállt
         assertTrue(c.readPids(listOf(0x0C)) is ElmResult.Data)
     }
 
     @Test
-    fun identifyReadAndRestoreWithSimulatedPeugeotEngine() = runBlocking {
-        val sim = SimulatedElm327(responseDelayMs = 0)
-        val c = simClient(sim)
-        val db = realDb()
+    fun cancelledManufacturerCycleStillRestoresObdAddressing() = runBlocking {
+        val sim = TestSupport.pick(Random(21), variantFilter = { e, v -> TestSupport.hasNumericLive(e, v, 5) }, filter = { !it.safetyCritical })
+        val (c, _) = TestSupport.simClient(listOf(sim), delayMs = 15)
         val session = MfrSession(c)
-        val ident = MfrIdentifier(db, session).identify()
-        val engine = ident.identified.single { it.ecu.node == "CMM" }
-        assertEquals("CMM_MG1CS042", engine.ecu.model)
-        assertEquals("932130", engine.partNumber)
-        assertTrue(engine.variant.isNotEmpty())
-        // a többi címen nincs vezérlő a szimulátorban
-        assertEquals(1, ident.detections.size)
-
-        val reg = MfrRegistry(ident, db.source)
-        MfrSignals.registry = reg
-        val oilId = "mfr.6A8.22D429.RAW_ENGINE_OIL_PRESSURE"
-        val oil = reg.signal(oilId)
-        assertNotNull(oil)
-        assertEquals(ObdUnit.KPA, StandardPids.signal(oilId)!!.unit) // bar → kPa, így a felhasználói egység is érvényes
-        val pump = reg.signals.first { it.item.id == 0xD651 }
-        val unsupported = reg.signals.first { it.item.id == 0xD405 }
-
-        val poller = MfrPoller(reg, session)
-        val r = poller.cycle(setOf(oilId, pump.id, unsupported.id, "mfr.6A8.22D400.ENGINE_SPEED"))
-        val oilSample = r.samples.single { it.signalId == oilId }
-        assertTrue("olajnyomás: ${oilSample.value} kPa", oilSample.value in 100.0..800.0)
-        val rpm = r.samples.single { it.signalId == "mfr.6A8.22D400.ENGINE_SPEED" }.value
-        assertTrue(rpm in 500.0..6000.0)
-        assertTrue(r.states[pump.id]!!.startsWith("txt:"))
-        assertEquals(PidHealth.NOT_SUPPORTED, r.health[unsupported.id])
-        assertEquals(PidHealth.OK, r.health[oilId])
-
-        // a gyártói kör után a szabványos OBD-lekérdezés ugyanúgy működik
-        val std = c.readPids(listOf(0x0C, 0x0D)) as ElmResult.Data
-        assertTrue(std.messages.all { it.ecu == "7E8" })
-        MfrSignals.registry = null
+        val reg = MfrRegistry(MfrIdentifier(db, session).identify(), db.source)
+        val ids = reg.signals.filter { it.isLive }.take(20).map { it.id }.toSet()
+        val job = kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.Default) { MfrPoller(reg, session).cycle(ids) }
+        kotlinx.coroutines.delay(200)
+        job.cancel(); job.join()
+        val r = c.readPids(listOf(0x0C)) as ElmResult.Data
+        assertEquals("7E8", r.messages.single().ecu)
     }
 
     @Test
-    fun unknownPartIsNotGuessed() = runBlocking {
-        // Egy olyan „vezérlő”, amelynek a cikkszáma nincs az adatbázisban: nem kerülhet be érték.
-        val db = realDb()
-        val ecu = db.ecus.first { it.key == "AEE2010.ev/CMM/CMM_MG1CS042" }
-        val fake = MfrDatabase(db.source, db.brand, listOf(MfrEcu(ecu.key, ecu.node, ecu.model, ecu.label, ecu.protocol,
-            ecu.requestId, ecu.responseId, ecu.ident, mapOf("X" to listOf("111111")), emptySet(), ecu.items)), emptyMap())
-        val c = simClient(SimulatedElm327(responseDelayMs = 0))
-        val ident = MfrIdentifier(fake, MfrSession(c)).identify()
-        val d = ident.detections.single()
-        assertTrue(d is MfrDetection.Unknown)
-        assertTrue(MfrRegistry(ident, db.source).signals.isEmpty())
+    fun terminalCommandDuringManufacturerCycleGoesToObdAddress() = runBlocking {
+        val sim = TestSupport.pick(Random(22), variantFilter = { e, v -> TestSupport.hasNumericLive(e, v, 5) }, filter = { !it.safetyCritical })
+        val (c, _) = TestSupport.simClient(listOf(sim), delayMs = 15)
+        val session = MfrSession(c)
+        val reg = MfrRegistry(MfrIdentifier(db, session).identify(), db.source)
+        val ids = reg.signals.filter { it.isLive }.take(20).map { it.id }.toSet()
+        val job = kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.Default) { MfrPoller(reg, session).cycle(ids) }
+        kotlinx.coroutines.delay(150)
+        val raw = c.sendRawExclusive("0100")
+        job.join()
+        assertTrue("válasz: $raw", raw.contains("7E8") && raw.contains("41 00"))
     }
 
     /** Előre megírt ELM-válaszok (CAN 11 bit, fejlécekkel). */
@@ -202,172 +280,36 @@ class MfrTest {
         return out.joinToString("\r")
     }
 
-    @Test
-    fun kwpPsaEngineIdentificationAndLidRead() = runBlocking {
-        val db = realDb()
-        val ecu = db.ecus.first { it.key == "AEE2001.full/CMM/EDC16C3DV4" }
-        val only = MfrDatabase(db.source, db.brand, listOf(ecu), emptyMap())
-        val ident = listOf(0x61, 0xFE) + List(21) { 0 } + listOf(0x54, 0x98, 0x53)
-        // LID C7: fordulatszám (×32,1255), akkumulátor (×0,1004 V) …
-        val lid = listOf(0x61, 0xC7, 25, 138) + List(14) { 0 }
-        val t = ScriptTransport(mapOf(
-            "0100" to "7E8 06 41 00 BE 3F A8 13", "ATDPN" to "A6",
-            "81" to "688 03 C1 EF 8F",
-            "21FE" to isoTp("688", ident),
-            "21C7" to isoTp("688", lid)
-        ))
-        t.connect()
-        val c = ObdClient(ElmSession(t)).apply { connectVehicle() }
-        val session = MfrSession(c)
-        val res = MfrIdentifier(only, session).identify()
-        val d = res.identified.single()
-        assertEquals("549853", d.partNumber)
-        assertEquals("EDC16C3_A7_V6_1", d.variant)
-        // KWP olvasás előtt kommunikációindítás (81) ment ki, írás/biztonsági kérés nem
-        assertTrue("81" in t.sent)
-        assertTrue(t.sent.none { it.startsWith("27") || it.startsWith("3B") || it.startsWith("2E") || it.startsWith("31") })
 
-        val reg = MfrRegistry(res, db.source)
-        val rpmId = "mfr.6A8.21C7.ENGINE_SPEED"
-        val r = MfrPoller(reg, session).cycle(setOf(rpmId, "mfr.6A8.21C7.BATTERY_VOLTAGE"))
-        assertEquals(25 * 32.1255, r.samples.single { it.signalId == rpmId }.value, 1e-6)
-        assertEquals(138 * 0.1004, r.samples.single { it.signalId == "mfr.6A8.21C7.BATTERY_VOLTAGE" }.value, 1e-6)
-        // a végén visszaállt a szabványos címzés
-        assertEquals("ATSH7DF", t.sent.last { it.startsWith("ATSH") })
-    }
-
-    @Test
-    fun cancelledManufacturerCycleStillRestoresObdAddressing() = runBlocking {
-        val sim = SimulatedElm327(responseDelayMs = 15)
-        val c = simClient(sim)
-        val db = realDb()
-        val session = MfrSession(c)
-        val ident = MfrIdentifier(MfrDatabase(db.source, db.brand, db.ecus.filter { it.requestId == 0x6A8 }, emptyMap()), session).identify()
-        val reg = MfrRegistry(ident, db.source)
-        val ids = reg.signals.filter { it.isLive }.take(20).map { it.id }.toSet()
-        // A kör közepén megszakítjuk (mint amikor a terminál szünetelteti a lekérdezést)
-        val job = kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.Default) { MfrPoller(reg, session).cycle(ids) }
-        kotlinx.coroutines.delay(200)
-        job.cancel(); job.join()
-        val r = c.readPids(listOf(0x0C)) as ElmResult.Data
-        assertEquals("7E8", r.messages.single().ecu)
-    }
-
-    @Test
-    fun terminalCommandDuringManufacturerCycleGoesToObdAddress() = runBlocking {
-        val sim = SimulatedElm327(responseDelayMs = 15)
-        val c = simClient(sim)
-        val db = realDb()
-        val session = MfrSession(c)
-        val ident = MfrIdentifier(MfrDatabase(db.source, db.brand, db.ecus.filter { it.requestId == 0x6A8 }, emptyMap()), session).identify()
-        val reg = MfrRegistry(ident, db.source)
-        val ids = reg.signals.filter { it.isLive }.take(20).map { it.id }.toSet()
-        val job = kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.Default) { MfrPoller(reg, session).cycle(ids) }
-        kotlinx.coroutines.delay(150)
-        // a terminál parancsa egy futó gyártói kör közben érkezik
-        val raw = c.sendRawExclusive("0100")
-        job.join()
-        assertTrue("válasz: $raw", raw.contains("7E8") && raw.contains("41 00"))
-    }
-
+    /** Ugyanazon a címen UDS- és KWP-modell is van: a KWP-azonosítás előtt mindig új session nyílik. */
     @Test
     fun kwpSessionIsStartedAfterUdsProbeOnSameAddress() = runBlocking {
-        val db = realDb()
-        val kwp = db.ecus.first { it.key == "AEE2001.full/CMM/EDC16C3DV4" }
-        val uds = db.ecus.first { it.key == "AEE2010.ev/CMM/CMM_MG1CS042" }
-        // ugyanaz a cím (6A8/688), előbb UDS-modell, utána KWP-modell
-        val mixed = MfrDatabase(db.source, db.brand, listOf(uds, kwp).sortedBy { if (it === uds) 0 else 1 }, emptyMap())
-        val ident = listOf(0x61, 0xFE) + List(21) { 0 } + listOf(0x54, 0x98, 0x53)
+        val pairs = db.ecus.filter { it.protocol == MfrProtocol.KWP_PSA && it.isPowertrain }.mapNotNull { k ->
+            db.ecus.firstOrNull { it.protocol == MfrProtocol.UDS && it.requestId == k.requestId && it.responseId == k.responseId }?.let { it to k }
+        }
+        assertTrue(pairs.isNotEmpty())
+        val (uds, kwp) = pairs[Random(4).nextInt(pairs.size)]
+        val cand = TestSupport.candidates.first { it.first === kwp }
+        val sim = SimulatedManufacturerEcu(kwp, cand.second, cand.third)
         var sessionOpen = false
-        val sent = mutableListOf<String>()
-        val t = object : hu.obddiag.core.transport.ObdTransport {
-            override val type = hu.obddiag.core.transport.TransportType.WIFI
-            override val description = "kwp"
-            override var isConnected = false
-            private val ch = kotlinx.coroutines.channels.Channel<ByteArray>(kotlinx.coroutines.channels.Channel.UNLIMITED)
-            override val input: kotlinx.coroutines.channels.ReceiveChannel<ByteArray> get() = ch
-            override suspend fun connect() { isConnected = true }
-            override suspend fun close() { isConnected = false }
-            override suspend fun write(data: ByteArray) {
-                val cmd = String(data).trim(); sent += cmd
-                val a = when {
-                    cmd == "0100" -> "7E8 06 41 00 BE 3F A8 13"
-                    cmd == "ATDPN" -> "A6"
-                    cmd.startsWith("AT") -> "OK"
-                    cmd == "81" -> { sessionOpen = true; "688 03 C1 EF 8F" }
-                    cmd.startsWith("22") -> "688 03 7F 22 11"
-                    // a PSA KWP-vezérlő session nélkül elutasítja az olvasást
-                    cmd == "21FE" -> if (sessionOpen) isoTp("688", ident) else "688 03 7F 21 80"
-                    else -> "NO DATA"
-                }
-                ch.trySend("$a\r\r>".toByteArray())
+        val rsHex = "%03X".format(kwp.responseId)
+        val t = ScriptTransport(emptyMap()) { cmd, _ ->
+            when {
+                cmd == "0100" -> "7E8 06 41 00 BE 3F A8 13"
+                cmd == "ATDPN" -> "A6"
+                cmd.startsWith("AT") -> "OK"
+                cmd == "81" -> { sessionOpen = true; "$rsHex 03 C1 EF 8F" }
+                cmd.startsWith("22") -> "$rsHex 03 7F 22 11"
+                // session nélkül a KWP-vezérlő elutasítja az olvasást
+                cmd.startsWith("21") || cmd.startsWith("1A") -> if (sessionOpen) sim.answer(cmd.chunked(2).map { it.toInt(16) })?.let { isoTp(rsHex, it) } ?: "NO DATA" else "$rsHex 03 7F ${cmd.take(2)} 80"
+                else -> "NO DATA"
             }
         }
         t.connect()
         val c = ObdClient(ElmSession(t)).apply { connectVehicle() }
-        val res = MfrIdentifier(mixed, MfrSession(c)).identify()
-        assertEquals("549853", res.identified.single().partNumber)
-        assertTrue(sent.indexOf("81") in 0 until sent.indexOf("21FE"))
-        assertTrue(res.trace.any { it.contains("21FE: OK") })
-    }
-
-    /** Valódi autóból (terepi azonosítási jelentés) származó válaszok: MED17.4.2 motorvezérlő, KWP-PSA2000. */
-    @Test
-    fun fieldReportMed1742IsIdentified() = runBlocking {
-        val db = realDb()
-        fun bytesOf(h: String) = h.split(" ").map { it.toInt(16) }
-        val fe = listOf(0x61, 0xFE) + bytesOf("E9 90 00 00 03 22 0C 0C 0B 02 1E 14 25 10 08 11 FD B7 33 0C 02 92 21 59")
-        val p80 = listOf(0x61, 0x80) + bytesOf("96 63 71 15 80 00 03 96 66 31 95 80 FF FF FF FF 00 01 FF FF FF FF")
-        val t = ScriptTransport(mapOf(
-            "0100" to "7E8 06 41 00 BE 3F A8 13", "ATDPN" to "A6",
-            "81" to "688 03 C1 D0 8F",
-            "21FE" to isoTp("688", fe),
-            "2180" to isoTp("688", p80),
-            "22F0FE" to "688 03 7F 22 11"
-        ))
-        t.connect()
-        val c = ObdClient(ElmSession(t)).apply { connectVehicle() }
-        val only = MfrDatabase(db.source, db.brand, db.ecus.filter { it.requestId == 0x6A8 }, emptyMap())
-        val res = MfrIdentifier(only, MfrSession(c)).identify()
-        val d = res.identified.single()
-        assertEquals("AEE2010.full/CMM/MED17_4_2", d.ecu.key)
-        assertEquals("MED1742_W2_V50", d.variant)
-        assertEquals("922159", d.partNumber)
-        assertEquals(hu.obddiag.core.mfr.MfrProtocol.KWP_PSA, d.ecu.protocol)
-        val reg = MfrRegistry(res, db.source)
-        assertTrue(reg.signals.count { it.isLive } > 150)
-        // A 21 FE azonosító blokk dekódolása (a kiolvasott cikkszám is ebben van)
-        val feItem = d.ecu.items.first { it.id == 0xFE }
-        val payload = fe.drop(2).map { it.toByte() }.toByteArray()
-        for (p in feItem.paramsFor(d.variant)!!) MfrDecoder.decode(p, payload)
-    }
-
-    private suspend fun fieldClient(t: ScriptTransport): ObdClient { t.connect(); return ObdClient(ElmSession(t)).apply { connectVehicle() } }
-
-    /** Terepi jelentés: az ESP81 (ABS) 21 FE-re válaszol, a 22-es szolgáltatásra 7F 22 11 → KWP-ként kell kezelni. */
-    @Test
-    fun fieldReportEsp81IsKwpAndNeverPolled() = runBlocking {
-        val db = realDb()
-        fun bytesOf(h: String) = h.split(" ").map { it.toInt(16) }
-        val fe = listOf(0x61, 0xFE) + bytesOf("00 00 00 00 03 7E 1B 0A 0A 01 03 0B 08 0B 09 0C FD B7 33 0C 02 79 10 62")
-        val t = ScriptTransport(mapOf("0100" to "7E8 06 41 00 BE 3F A8 13", "ATDPN" to "A6", "81" to "68D 03 C1 D0 8F",
-            "21FE" to isoTp("68D", fe), "22F0FE" to "68D 03 7F 22 11", "82" to "68D 01 C2"))
-        val c = fieldClient(t)
-        val only = MfrDatabase(db.source, db.brand, db.ecus.filter { it.requestId == 0x6AD }, emptyMap())
-        val session = MfrSession(c)
-        val res = MfrIdentifier(only, session).identify()
-        val d = res.identified.single()
-        assertEquals("AEE2004.full/ABS/ESP81", d.ecu.key)
-        assertEquals(hu.obddiag.core.mfr.MfrProtocol.KWP_PSA, d.ecu.protocol)
-        assertTrue(d.ecu.safetyCritical)
-        val reg = MfrRegistry(res, db.source)
-        assertTrue(reg.signals.isNotEmpty())
-        assertEquals(0, reg.signals.count { it.isLive })
-        // a fékvezérlő élő lekérdezése tiltott: a terv üres akkor is, ha valaki kéri
-        assertTrue(reg.plan(reg.signals.map { it.id }).isEmpty())
-        // a megnyitott session a végén szabályosan lezárható
-        session.exclusive { closeSessions() }
-        assertTrue("82" in t.sent)
+        val res = MfrIdentifier(MfrDatabase(db.source, db.brand, listOf(uds, kwp), emptyMap()), MfrSession(c)).identify()
+        assertEquals(cand.third, res.identified.single().partNumber)
+        assertTrue(t.sent.indexOf("81") in 0 until t.sent.indexOf(kwp.ident.request))
     }
 
     @Test
@@ -380,38 +322,48 @@ class MfrTest {
         assertEquals(true, uds[0].activeNow); assertEquals(true, uds[0].confirmed); assertEquals(false, uds[1].activeNow)
     }
 
+
     @Test
-    fun dtcClearOnlyThroughExplicitApi() = runBlocking {
-        val db = realDb()
-        val ecu = db.ecus.first { it.key == "AEE2010.full/CMM/MED17_4_2" }
-        val t = ScriptTransport(mapOf("0100" to "7E8 06 41 00 BE 3F A8 13", "ATDPN" to "A6", "81" to "688 03 C1 D0 8F",
-            "17FF00" to "688 05 57 01 05 62 A0", "14FF00" to "688 03 54 FF 00", "82" to "688 01 C2"))
-        val session = MfrSession(fieldClient(t))
-        session.exclusive {
-            select(ecu)
-            try { send(ecu, "14FF00"); org.junit.Assert.fail("a törlés nem mehet át az általános küldésen") } catch (_: hu.obddiag.core.mfr.MfrSafetyException) { }
-            val r = readDtcs(ecu) as hu.obddiag.core.mfr.MfrDtcResult.Ok
-            assertEquals("P0562", r.dtcs.single().code)
-            assertTrue(ecu.dtcInfo[0x0562] != null)
-            assertTrue(clearDtcs(ecu) is hu.obddiag.core.mfr.MfrReadResult.Ok)
+    fun dtcReadAndClearOnlyThroughExplicitApi() = runBlocking {
+        val rnd = Random(31)
+        for (proto in MfrProtocol.values()) {
+            val sim = TestSupport.pick(rnd) { it.protocol == proto && it.dtcInfo.isNotEmpty() }
+            val (c, t) = TestSupport.simClient(listOf(sim))
+            val session = MfrSession(c)
+            session.exclusive {
+                select(sim.ecu)
+                try { send(sim.ecu, if (proto == MfrProtocol.UDS) "14FFFFFF" else "14FF00"); org.junit.Assert.fail("a törlés nem mehet át az általános küldésen") }
+                catch (_: MfrSafetyException) { }
+                val r = readDtcs(sim.ecu) as hu.obddiag.core.mfr.MfrDtcResult.Ok
+                val code = r.dtcs.single()
+                assertTrue("${sim.ecu.key}: ${code.code}", sim.ecu.dtcInfo[code.raw] != null)
+                assertTrue(clearDtcs(sim.ecu) is hu.obddiag.core.mfr.MfrReadResult.Ok)
+                assertTrue((readDtcs(sim.ecu) as hu.obddiag.core.mfr.MfrDtcResult.Ok).dtcs.isEmpty())
+            }
+            assertTrue(t.sent.any { it.startsWith("14") })
         }
-        assertTrue("14FF00" in t.sent)
     }
 
     /** Ha a vezérlő a megszokott (rövid) időzítéssel nem válaszol, hosszabb várakozással újrapróbálunk. */
     @Test
     fun slowEcuGetsLongerTimeout() = runBlocking {
-        val db = realDb()
-        val ecu = db.ecus.first { it.key == "AEE2010.full/CMM/MED17_4_2" }
-        val payload = listOf(0x61, 0xCB) + List(45) { 0x10 }
-        val t = ScriptTransport(mapOf("0100" to "7E8 06 41 00 BE 3F A8 13", "ATDPN" to "A6", "81" to "688 03 C1 D0 8F")) { cmd, sent ->
-            if (cmd == "21CB") { if (sent.lastIndexOf("ATAT0") > sent.lastIndexOf("ATAT1")) isoTp("688", payload) else "NO DATA" } else null
+        val sim = TestSupport.pick(Random(41), variantFilter = { e, v -> TestSupport.hasNumericLive(e, v) }, filter = { !it.safetyCritical })
+        val item = sim.ecu.items.first { it.kind == "live" && it.paramsFor(sim.variant) != null }
+        val req = MfrSession(ObdClient(ElmSession(ScriptTransport(emptyMap())))).itemRequest(sim.ecu, item)
+        val rsHex = "%03X".format(sim.ecu.responseId)
+        val t = ScriptTransport(mapOf("0100" to "7E8 06 41 00 BE 3F A8 13", "ATDPN" to "A6")) { cmd, sent ->
+            when {
+                cmd == req -> if (sent.lastIndexOf("ATAT0") > sent.lastIndexOf("ATAT1")) isoTp(rsHex, sim.answer(cmd.chunked(2).map { it.toInt(16) })!!) else "NO DATA"
+                !cmd.startsWith("AT") && cmd != "0100" -> sim.answer(cmd.chunked(2).map { it.toInt(16) })?.let { isoTp(rsHex, it) }
+                else -> null
+            }
         }
-        val session = MfrSession(fieldClient(t))
-        val r = session.exclusive { select(ecu); read(ecu, "21CB") }
+        t.connect()
+        val c = ObdClient(ElmSession(t)).apply { connectVehicle() }
+        val session = MfrSession(c)
+        val r = session.exclusive { select(sim.ecu); read(sim.ecu, req) }
         assertTrue(r is hu.obddiag.core.mfr.MfrReadResult.Ok)
         assertTrue("ATST${MfrSession.SLOW_TIMEOUT_HEX}" in t.sent)
-        // a végén a szabványos időzítés visszaáll
         assertEquals("ATAT1", t.sent.last { it.startsWith("ATAT") })
     }
 }

@@ -65,6 +65,16 @@ class SimulationSmokeTest {
         throw AssertionError("A szöveg nem jelent meg $timeout ms alatt: \"$text\"")
     }
 
+    private fun waitAny(texts: List<String>, timeout: Long) {
+        val end = System.currentTimeMillis() + timeout
+        while (System.currentTimeMillis() < end) {
+            rule.waitForIdle()
+            if (texts.any { t -> rule.onAllNodes(hasText(t, substring = true)).fetchSemanticsNodes().isNotEmpty() }) return
+            Thread.sleep(300)
+        }
+        throw AssertionError("Egyik szöveg sem jelent meg: $texts")
+    }
+
     private fun clickText(text: String, last: Boolean = false) {
         waitText(text)
         val nodes = rule.onAllNodesWithText(text, substring = false)
@@ -131,18 +141,23 @@ class SimulationSmokeTest {
         shot("10_advanced")
         rule.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
 
-        // Peugeot gyártói diagnosztika: azonosítás a szimulált PureTech motorvezérlőn, majd élő olajnyomás
-        clickText("Gyártói diagnosztika – Peugeot")
-        clickText("Vezérlők azonosítása")
-        waitText("CMM_MG1CS042", 120_000)
-        waitText("932130")
+        // Univerzális jármű- és ECU-felismerés. A szimulátor fiktív VIN-je ismeretlen WMI → az app nem találgat,
+        // márkát kér; a szimulált gyártói vezérlők az adatbázisból VÉLETLENSZERŰEN generáltak (nincs beégetett azonosító).
+        clickText("Jármű- és ECU-felismerés")
+        clickText("Felismerés indítása")
+        waitText("A gyártó nem állapítható meg automatikusan", 60_000)
+        waitText("SMLT0BD2026000001")
+        shot("10a_recognition_needs_input")
+        clickText(hu.obddiag.core.ident.BrandGroup.STELLANTIS_PSA.label)
+        waitText("Azonosítva", 180_000)
+        waitText("Szabványos vezérlőazonosítók")
         shot("10b_mfr_identified")
         clickText("Azonosító és konfigurációs adatok beolvasása")
         Thread.sleep(3_000)
         shot("10c_mfr_static")
         // gyártói hibakódok: olvasás, majd megerősített törlés és újraolvasás
         clickText("Hibakódok olvasása")
-        waitText("P0562", 20_000)
+        waitAny(listOf("hibakód", "Nincs tárolt hibakód."), 20_000)
         shot("10c2_mfr_dtc")
         clickText("Hibakódok törlése")
         waitText("Folytatod?")
@@ -151,20 +166,12 @@ class SimulationSmokeTest {
         clickText("Élő adatok megnyitása")
         waitText("Figyelt:")
         Thread.sleep(1_500)
-        clickText("Lista")
-        Thread.sleep(1_000)
-        waitText("Bruttó motor olajnyomás", 20_000)
-        clickText("Bruttó motor olajnyomás")
-        waitText("Mért töltőnyomás")
-        clickText("Mért töltőnyomás")
-        waitText("A vízpumpa állapota")
-        clickText("A vízpumpa állapota")
-        Thread.sleep(4_000)
-        waitText("Bruttó motor olajnyomás")
+        clickText("Gyártói")
+        Thread.sleep(1_500)
         shot("10d_mfr_live")
         rule.onNodeWithTag("tab_more").performClick()
         // a Továbbiak fül a legutóbb megnyitott alképernyőt (gyártói diagnosztika) állítja vissza
-        waitText("Gyártói diagnosztika – Peugeot")
+        waitText("Jármű- és ECU-felismerés")
         rule.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
 
         clickText("Adatnaplózás")

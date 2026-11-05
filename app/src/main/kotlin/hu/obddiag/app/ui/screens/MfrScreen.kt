@@ -88,7 +88,9 @@ class MfrViewModel(val c: AppContainer) : ViewModel() {
     var staticLoading by mutableStateOf<String?>(null)
         private set
 
-    fun identify() = viewModelScope.launch { c.mfr.identify() }
+    fun identify(group: hu.obddiag.core.ident.BrandGroup? = c.mfr.userGroup) = viewModelScope.launch { c.mfr.recognize(group) }
+    val supportedGroups get() = c.mfr.supportedGroups
+    var otherBrandChosen by mutableStateOf(false)
 
     /** Vezérlőnként a kiolvasott gyártói hibakódok (vagy hibaüzenet). */
     val dtcs = mutableStateMapOf<String, hu.obddiag.core.mfr.MfrDtcResult>()
@@ -130,9 +132,10 @@ class MfrViewModel(val c: AppContainer) : ViewModel() {
     }
 
     /** Megosztható azonosítási jelentés: címenként a nyers válaszok és a kiolvasott cikkszámok. */
-    fun report(r: hu.obddiag.core.mfr.MfrIdentification): String = buildString {
+    fun report(rec: hu.obddiag.core.ident.VehicleRecognition): String = buildString {
+        val r = rec.manufacturer ?: hu.obddiag.core.mfr.MfrIdentification(emptyList(), 0, true)
         val conn = c.connection.state.value as? ConnectionState.Connected
-        append("OBD Diagnosztika ").append(hu.obddiag.app.BuildConfig.VERSION_NAME).append(" – gyártói azonosítási jelentés\n")
+        append("OBD Diagnosztika ").append(hu.obddiag.app.BuildConfig.VERSION_NAME).append(" – jármű- és ECU-felismerési jelentés\n")
         append("Idő: ").append(java.time.Instant.now()).append('\n')
         c.connection.mfr.value?.source?.let { append("Adatbázis: ").append(it.name).append(' ').append(it.commit.take(8)).append('\n') }
         conn?.let {
@@ -140,9 +143,10 @@ class MfrViewModel(val c: AppContainer) : ViewModel() {
             append(" | Protokoll: ").append(it.vehicle.protocol.displayName).append(" | ECU-k: ").append(it.vehicle.ecus.joinToString()).append('\n')
             if (it.simulated) append("SZIMULÁLT KAPCSOLAT\n")
         }
+        append('\n').append(rec.report().substringBefore("== Felismerési napló ==")).append('\n')
         append("Flow control: ").append(if (r.flowControlSupported) "OK" else "NEM támogatott").append('\n')
         r.error?.let { append("Hiba: ").append(it).append('\n') }
-        append("\n== Eredmény ==\n")
+        append("\n== Gyártói profilok ==\n")
         for (d in r.detections) {
             append("%03X→%03X ".format(d.requestId, d.responseId))
             when (d) {
@@ -168,8 +172,8 @@ class MfrViewModel(val c: AppContainer) : ViewModel() {
             append("\n== Gyártói olvasások (utolsó ").append(log.size).append(") ==\n")
             log.forEach { append(it).append('\n') }
         }
-        append("\n== Részletek (").append(r.probedAddresses).append(" cím) ==\n")
-        r.trace.forEach { append(it).append('\n') }
+        append("\n== Felismerési napló ==\n")
+        append(rec.report().substringAfter("== Felismerési napló ==\n"))
     }
 
     fun readStatic(det: MfrDetection.Identified, onUnsupported: String) {
@@ -239,31 +243,43 @@ fun MfrScreen(nav: NavController) {
                 MfrState.Loading -> item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
                 is MfrState.Running -> item {
                     Column {
-                        LinearProgressIndicator(progress = { if (st.total == 0) 0f else st.done.toFloat() / st.total }, modifier = Modifier.fillMaxWidth())
-                        Text(stringResource(R.string.mfr_progress, st.done, st.total), style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
+                        LinearProgressIndicator(Modifier.fillMaxWidth())
+                        val text = when {
+                            st.stage == "protocol" -> stringResource(R.string.rec_stage_protocol)
+                            st.stage == "vin" -> stringResource(R.string.rec_stage_vin)
+                            st.stage == "ecu" -> stringResource(R.string.rec_stage_ecu)
+                            st.stage == "brand" -> stringResource(R.string.rec_stage_brand)
+                            else -> stringResource(R.string.rec_stage_source, st.stage.substringAfter(':'))
+                        }
+                        Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
                     }
                 }
                 is MfrState.Failed -> item { ErrorBanner(stringResource(R.string.mfr_failed), detail = st.message) }
                 is MfrState.Done -> {
+                    val rec = st.recognition
                     val r = st.result
-                    r.error?.let { e -> item { ErrorBanner(stringResource(R.string.mfr_failed), detail = e) } }
-                    if (!r.flowControlSupported) item { ErrorBanner(stringResource(R.string.mfr_no_flow_control), detail = stringResource(R.string.mfr_no_flow_control_detail)) }
+                    item { VehicleCard(rec) }
+                    if (rec.support == hu.obddiag.core.ident.SupportLevel.NEEDS_INPUT) item { BrandInputCard(vm) }
+                    item { StandardIdsCard(rec) }
+                    item { SourcesCard(rec) }
+                    r?.error?.let { e -> item { ErrorBanner(stringResource(R.string.mfr_failed), detail = e) } }
+                    if (r != null && !r.flowControlSupported) item { ErrorBanner(stringResource(R.string.mfr_no_flow_control), detail = stringResource(R.string.mfr_no_flow_control_detail)) }
                     item {
                         AppCard {
-                            Text(stringResource(R.string.mfr_summary, r.identified.size, r.detections.size, r.probedAddresses), style = MaterialTheme.typography.titleSmall)
+                            if (r != null) Text(stringResource(R.string.mfr_summary, r.identified.size, r.detections.size, r.probedAddresses), style = MaterialTheme.typography.titleSmall)
+                            Text(stringResource(R.string.rec_log_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             val context = LocalContext.current
                             val scope = androidx.compose.runtime.rememberCoroutineScope()
                             Spacer(Modifier.height(8.dp))
                             OutlinedButton(onClick = {
                                 scope.launch {
-                                    hu.obddiag.app.data.CsvExporter.share(context, "gyartoi_azonositas_${hu.obddiag.app.data.CsvExporter.fileStamp()}.txt",
-                                        vm.report(r), "text/plain", context.getString(R.string.share))
+                                    hu.obddiag.app.data.CsvExporter.share(context, "jarmu_felismeres_${hu.obddiag.app.data.CsvExporter.fileStamp()}.txt",
+                                        vm.report(rec), "text/plain", context.getString(R.string.share))
                                 }
                             }, modifier = Modifier.fillMaxWidth()) {
                                 Icon(Icons.Outlined.Share, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.mfr_share_report))
                             }
-                            if (r.identified.isNotEmpty()) {
+                            if (r != null && r.identified.isNotEmpty()) {
                                 Spacer(Modifier.height(8.dp))
                                 OutlinedButton(onClick = { vm.readDtcs(r.identified) }, enabled = vm.dtcBusy == null, modifier = Modifier.fillMaxWidth()) {
                                     if (vm.dtcBusy != null) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp) else Icon(Icons.Outlined.ReportProblem, null)
@@ -281,13 +297,93 @@ fun MfrScreen(nav: NavController) {
                             }
                         }
                     }
-                    if (r.detections.isEmpty()) item {
+                    if (r != null && r.detections.isEmpty() && rec.sources.any { it.ran }) item {
                         EmptyState(Icons.Outlined.HelpOutline, stringResource(R.string.mfr_none_title), stringResource(R.string.mfr_none_message))
                     }
-                    items(r.detections, key = { "%03X".format(it.requestId) }) { d -> DetectionCard(d, registry, vm, unsupportedFmt) }
+                    if (r != null) items(r.detections, key = { "%03X".format(it.requestId) }) { d -> DetectionCard(d, registry, vm, unsupportedFmt) }
                 }
                 MfrState.Idle -> Unit
             }
+        }
+    }
+}
+
+@Composable
+private fun VehicleCard(rec: hu.obddiag.core.ident.VehicleRecognition) {
+    AppCard {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(stringResource(R.string.rec_vehicle), style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+            val color = when (rec.support) {
+                hu.obddiag.core.ident.SupportLevel.MANUFACTURER -> AppTheme.status.ok
+                hu.obddiag.core.ident.SupportLevel.STANDARD_ONLY -> AppTheme.status.warning
+                hu.obddiag.core.ident.SupportLevel.NEEDS_INPUT -> AppTheme.status.danger
+            }
+            StatusPill(when (rec.support) {
+                hu.obddiag.core.ident.SupportLevel.MANUFACTURER -> stringResource(R.string.mfr_identified)
+                hu.obddiag.core.ident.SupportLevel.STANDARD_ONLY -> "OBD-II"
+                hu.obddiag.core.ident.SupportLevel.NEEDS_INPUT -> "?"
+            }, color)
+        }
+        Spacer(Modifier.height(6.dp))
+        InfoRow(stringResource(R.string.rec_protocol), rec.protocol ?: "–")
+        InfoRow(stringResource(R.string.rec_ecus), rec.respondingEcus.joinToString().ifEmpty { "–" })
+        InfoRow(stringResource(R.string.rec_vin), (rec.vin?.vin ?: rec.vinRaw ?: stringResource(R.string.rec_vin_none)) + (rec.vinSource?.let { " · $it" } ?: ""))
+        rec.vin?.let { v ->
+            InfoRow(stringResource(R.string.rec_manufacturer), "${v.wmi} → ${v.manufacturer ?: "?"}")
+            if (v.modelYears.isNotEmpty()) InfoRow(stringResource(R.string.rec_model_year), v.modelYears.joinToString(" / "))
+        }
+        InfoRow(stringResource(R.string.rec_group), rec.group?.let { if (rec.groupFromUser) stringResource(R.string.rec_group_user, it.label) else it.label } ?: "–")
+        InfoRow(stringResource(R.string.rec_support), rec.support.label)
+    }
+}
+
+@Composable
+private fun BrandInputCard(vm: MfrViewModel) {
+    AppCard {
+        Text(stringResource(R.string.rec_need_title), style = MaterialTheme.typography.titleSmall)
+        Spacer(Modifier.height(4.dp))
+        Text(stringResource(R.string.rec_need_text), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.height(8.dp))
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            vm.supportedGroups.forEach { g ->
+                OutlinedButton(onClick = { vm.otherBrandChosen = false; vm.identify(g) }) { Text(g.label) }
+            }
+            OutlinedButton(onClick = { vm.otherBrandChosen = true }) { Text(stringResource(R.string.rec_other_brand)) }
+        }
+        if (vm.otherBrandChosen) Text(stringResource(R.string.rec_other_brand_note), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 6.dp))
+    }
+}
+
+@Composable
+private fun StandardIdsCard(rec: hu.obddiag.core.ident.VehicleRecognition) {
+    AppCard {
+        Text(stringResource(R.string.rec_std_ids), style = MaterialTheme.typography.titleSmall)
+        if (rec.ecus.isEmpty()) Text("–", style = MaterialTheme.typography.bodySmall)
+        rec.ecus.forEach { e ->
+            Spacer(Modifier.height(6.dp))
+            Text(e.address + (e.diagProtocol?.let { " · $it" } ?: ""), style = ValueText.mono, fontWeight = FontWeight.SemiBold)
+            e.ecuName?.let { InfoRow(stringResource(R.string.rec_ident_name), it) }
+            if (e.calibrationIds.isNotEmpty()) InfoRow("CALID", e.calibrationIds.joinToString(" / "))
+            if (e.cvns.isNotEmpty()) InfoRow("CVN", e.cvns.joinToString(" / "))
+            e.identifiers.forEach { (k, v) -> InfoRow(k, v) }
+            if (e.ecuName == null && e.calibrationIds.isEmpty() && e.identifiers.isEmpty())
+                Text(stringResource(R.string.rec_std_none), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun SourcesCard(rec: hu.obddiag.core.ident.VehicleRecognition) {
+    AppCard {
+        Text(stringResource(R.string.rec_sources), style = MaterialTheme.typography.titleSmall)
+        rec.sources.forEach { s ->
+            Spacer(Modifier.height(6.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(s.sourceName, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                StatusPill(stringResource(if (s.ran) R.string.rec_source_ran else R.string.rec_source_skipped),
+                    if (s.ran) AppTheme.status.ok else MaterialTheme.colorScheme.outline)
+            }
+            Text(s.reason, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

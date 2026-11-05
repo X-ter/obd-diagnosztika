@@ -20,8 +20,17 @@ import kotlin.math.sin
  */
 class SimulatedElm327(
     private val responseDelayMs: Long = 25,
-    private val clock: () -> Long = System::currentTimeMillis
+    private val clock: () -> Long = System::currentTimeMillis,
+    /**
+     * Fizikailag címzett, szimulált gyártói vezérlők (pl. egy adatbázisból generálva). Lustán kérdezzük le,
+     * az első nem szabványos címre küldött kéréskor.
+     */
+    private val manufacturerEcus: () -> List<SimEcu> = { emptyList() },
+    /** A szimulált jármű VIN-je; null = a jármű nem adja meg (Mode 09 / 02 nem támogatott). */
+    private val vin: String? = SIM_VIN
 ) : ObdTransport {
+
+    private val simEcus: List<SimEcu> by lazy { runCatching(manufacturerEcus).getOrDefault(emptyList()) }
 
     override val type = TransportType.SIMULATION
     override val description = "Szimulált ELM327 (demó jármű)"
@@ -154,10 +163,19 @@ class SimulatedElm327(
         if (cmd.startsWith("AT")) return respondAt(cmd.substring(2))
         if (cmd.startsWith("ST")) return listOf("?")
         if (!cmd.all { it.isDigit() || it in 'A'..'F' }) return listOf("?")
-        if (txHeader == PSA_ENGINE_RQ) {
-            respHeader = "688"
-            val r = psaEngine(cmd) ?: return listOf("NO DATA")
+        if (txHeader != "7DF" && txHeader != "7E0") {
+            val rq = txHeader.toIntOrNull(16)
+            val ecu = simEcus.firstOrNull { it.requestId == rq } ?: return listOf("NO DATA")
+            respHeader = "%03X".format(ecu.responseId)
+            val r = ecu.answer(cmd.chunked(2).map { it.toInt(16) }) ?: return listOf("NO DATA")
             return frames(r)
+        }
+        // A szabványos motorvezérlő fizikai címen (7E0) a dokumentált ISO 14229 azonosítókra is válaszol
+        if (txHeader == "7E0" && cmd.startsWith("22") && cmd.length == 6) {
+            respHeader = "7E8"
+            val did = cmd.substring(2).toInt(16)
+            val text = (if (did == 0xF190) vin else STANDARD_IDS[did]) ?: return frames(listOf(0x7F, 0x22, 0x31))
+            return frames(listOf(0x62, did shr 8, did and 0xFF) + text.map { it.code })
         }
         if (txHeader != "7DF" && txHeader != "7E0") return listOf("NO DATA")
         if (cmd.length >= 2 && cmd.substring(0, 2).toInt(16) !in 0x01..0x0A) return listOf("NO DATA")
@@ -334,7 +352,7 @@ class SimulatedElm327(
         fun ascii(s: String) = s.map { it.code }
         return when (info) {
             0x00 -> listOf(0x49, 0x00, 0x54, 0x40, 0x00, 0x00) // 02, 04, 06, 0A
-            0x02 -> listOf(0x49, 0x02, 0x01) + ascii(SIM_VIN)
+            0x02 -> vin?.let { listOf(0x49, 0x02, 0x01) + ascii(it) }
             0x04 -> listOf(0x49, 0x04, 0x01) + ascii("SIMCAL0000000001")
             0x06 -> listOf(0x49, 0x06, 0x01, 0x1A, 0x2B, 0x3C, 0x4D)
             0x0A -> listOf(0x49, 0x0A, 0x01) + ascii("ECM-EngineControl").let { it + List(20 - it.size) { 0 } }
@@ -342,46 +360,12 @@ class SimulatedElm327(
         }
     }
 
-    /**
-     * SZIMULÁLT PSA motorvezérlő a PSA-RE leírása szerint (CMM_MG1CS042, 1.2 PureTech, „B78_V1” változat, cikkszám 932130).
-     * Csak néhány élő DID-re válaszol; minden másra „requestOutOfRange” (7F 22 31), mint egy valódi vezérlő.
-     */
-    private fun psaEngine(cmd: String): List<Int>? {
-        val b = cmd.chunked(2).map { it.toInt(16) }
-        val e = engine()
-        fun u16(v: Double): List<Int> { val x = v.roundToInt().coerceIn(0, 65535); return listOf(x shr 8, x and 0xFF) }
-        fun s16(v: Double): List<Int> { val x = v.roundToInt().coerceIn(-32768, 32767) and 0xFFFF; return listOf(x shr 8, x and 0xFF) }
-        if (b.isEmpty()) return null
-        return when (b[0]) {
-            0x22 -> {
-                if (b.size != 3) return listOf(0x7F, 0x22, 0x13)
-                val did = (b[1] shl 8) or b[2]
-                val data: List<Int>? = when (did) {
-                    0xF0FE -> List(21) { 0x00 } + listOf(0x93, 0x21, 0x30) + List(4) { 0x00 }
-                    0xD400 -> u16(e.rpm)
-                    0xD40A -> s16(e.coolant)
-                    0xD429 -> s16((1.2 + e.rpm / 1500.0) * 1000)            // olajnyomás, 0,001 bar/bit
-                    0xD464 -> u16((1.0 + e.rpm / 1600.0) * 1000)            // előírt olajnyomás
-                    0xD47D -> u16((e.coolant * 1.05 + 273.15) / 0.0234375) // olajhőmérséklet
-                    0xD47E -> u16((1013.0 + e.load * 4) / 0.078125)        // mért töltőnyomás, mbar
-                    0xD651 -> listOf(if (e.coolant > 60) 0x01 else 0x00)    // hűtővízszivattyú állapota (enum)
-                    else -> null
-                }
-                if (data == null) listOf(0x7F, 0x22, 0x31) else listOf(0x62, b[1], b[2]) + data
-            }
-            0x3E -> listOf(0x7E, 0x00)
-            // gyártói hibakódok: egy szimulált tárolt kód (P0562 – alacsony tápfeszültség), amíg nem törlik
-            0x19 -> if (b.getOrNull(1) == 0x02) listOf(0x59, 0x02, 0xFF) + (if (psaDtcStored) listOf(0x05, 0x62, 0x16, 0x08) else emptyList())
-                    else listOf(0x7F, 0x19, 0x12)
-            0x14 -> { psaDtcStored = false; listOf(0x54) }
-            else -> listOf(0x7F, b[0], 0x11)
-        }
-    }
-
-    @Volatile private var psaDtcStored = true
-
     companion object {
-        const val PSA_ENGINE_RQ = "6A8"
+        /** Szándékosan felismerhetően fiktív szabványos azonosítók (ISO 14229-1 C.1). */
+        val STANDARD_IDS = mapOf(
+            0xF187 to "SIM-0000-PART", 0xF18A to "SIMULATOR",
+            0xF191 to "SIM-HW-01", 0xF195 to "SIM-SW-1.0", 0xF197 to "SIM ENGINE"
+        )
         /** Szándékosan felismerhetően fiktív alvázszám. */
         const val SIM_VIN = "SMLT0BD2026000001"
     }

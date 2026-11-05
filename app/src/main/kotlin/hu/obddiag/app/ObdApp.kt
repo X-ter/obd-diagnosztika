@@ -46,7 +46,7 @@ class AppContainer(private val context: Context) {
         is AdapterTarget.Classic -> TransportFactory { BluetoothClassicTransport(context, target.address, target.name) }
         is AdapterTarget.Ble -> TransportFactory { BleTransport(context, target.address, target.name) }
         is AdapterTarget.Wifi -> TransportFactory { WifiTransport(context, target.host, target.port) }
-        AdapterTarget.Simulation -> TransportFactory { SimulatedElm327() }
+        AdapterTarget.Simulation -> TransportFactory { SimulatedElm327(manufacturerEcus = { mfr.simulationEcus() }) }
     }
 
     fun connect(target: AdapterTarget) {

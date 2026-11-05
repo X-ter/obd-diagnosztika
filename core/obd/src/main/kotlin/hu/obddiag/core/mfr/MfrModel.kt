@@ -196,6 +196,8 @@ class MfrDatabase(val source: MfrSource, val brand: String, val ecus: List<MfrEc
             val root = rootAny as Map<String, Any?>
             val fmt = (root["format"] as? Number)?.toInt()
             require(fmt == 1 || fmt == 2) { "Ismeretlen adatbázis-formátum" }
+            // Csak aktívan lekérdezhető diagnosztikai definíciók tölthetők be; passzív (broadcast) CAN-leírás nem.
+            (root["kind"] as? String)?.let { require(it == "active-diagnostic") { "Az adatbázis nem aktív diagnosztikai definíciókat tartalmaz: $it" } }
             val src = root["source"] as Map<String, Any?>
             val ecus = (root["ecus"] as List<Map<String, Any?>>).mapIndexed { idx, e ->
                 val id = e["ident"] as Map<String, Any?>

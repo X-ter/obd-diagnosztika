@@ -17,6 +17,9 @@ class MfrSignal(
 ) {
     /** Folyamatosan lekérdezhető élő érték. Biztonságkritikus vezérlőnél (fék, kormány…) soha. */
     val isLive: Boolean get() = item.kind == "live" && !ecu.safetyCritical
+
+    /** Mindig aktívan lekérdezett gyártói diagnosztikai paraméter – sosem passzív CAN-üzenet. */
+    val origin: hu.obddiag.core.ident.DataOrigin get() = hu.obddiag.core.ident.DataOrigin.MANUFACTURER_ACTIVE
 }
 
 /**

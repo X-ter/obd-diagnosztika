@@ -48,7 +48,10 @@ class MfrIdentifier(private val db: MfrDatabase, private val session: MfrSession
         }
         val detections = mutableListOf<MfrDetection>()
         trace.clear()
-        val addresses = db.addresses.entries.groupBy({ it.key.first to it.key.second }, { it.value }).entries.toList()
+        // Csak a jármű protokolljának megfelelő (11 bites) címek; a 29 bites címzésű modelleket itt nem lehet elérni.
+        val (usable, other) = db.addresses.entries.partition { it.key.first <= 0x7FF && it.key.second <= 0x7FF }
+        if (other.isNotEmpty()) trace += "${other.map { it.key.first }.distinct().size} cím 29 bites címzést igényel – ezen a kapcsolaton kihagyva"
+        val addresses = usable.groupBy({ it.key.first to it.key.second }, { it.value }).entries.toList()
         var done = 0
         for ((addr, ecuLists) in addresses) {
             val ecus = ecuLists.flatten()
@@ -70,6 +73,7 @@ class MfrIdentifier(private val db: MfrDatabase, private val session: MfrSession
         val parts = mutableListOf<String>()
         val matches = mutableListOf<Triple<MfrEcu, String, String>>()
         var anyAnswer = false
+        var positive = false
         // Protokollonként (UDS / KWP) és azonosító kérésenként egyszer kérdezünk.
         for ((proto, byProto) in ecus.groupBy { it.protocol }) {
             var first = true
@@ -87,10 +91,13 @@ class MfrIdentifier(private val db: MfrDatabase, private val session: MfrSession
                 if (r is MfrReadResult.NoResponse && !anyAnswer) continue
                 if (r !is MfrReadResult.Ok) { if (r is MfrReadResult.Negative) anyAnswer = true; continue }
                 anyAnswer = true
+                positive = true
                 for (ecu in group) {
                     val off = ecu.ident.byteOffset
                     if (off + ecu.ident.byteLength > r.payload.size) continue
                     val part = MfrDecoder.bcd(r.payload.copyOfRange(off, off + ecu.ident.byteLength))
+                    // csupa 0 / csupa F: kitöltés vagy üres mező, nem cikkszám – ezzel nem illesztünk
+                    if (part.all { it == '0' } || part.all { it == 'F' }) continue
                     parts += part
                     ecu.variantForPart(part)?.let { matches += Triple(ecu, it, part) }
                     if (part in ecu.ambiguousParts) matches += Triple(ecu, "", part)
@@ -100,8 +107,9 @@ class MfrIdentifier(private val db: MfrDatabase, private val session: MfrSession
         }
         if (anyAnswer) trace += "%03X: kiolvasott cikkszámok: %s; egyezés: %s".format(rq, parts.distinct().joinToString().ifEmpty { "–" },
             matches.joinToString { "${it.first.key} (${it.second.ifEmpty { "nem egyértelmű" }})" }.ifEmpty { "nincs" })
+        if (anyAnswer && !positive) trace += "%03X: a vezérlő elutasította az azonosító kérés(eke)t – ezzel a forrással nem azonosítható".format(rq)
         when {
-            !anyAnswer -> null
+            !positive -> null
             matches.size == 1 && matches[0].second.isNotEmpty() ->
                 MfrDetection.Identified(rq, rs, nodes, matches[0].first, matches[0].second, matches[0].third)
             matches.isNotEmpty() ->

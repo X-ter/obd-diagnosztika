@@ -78,6 +78,12 @@ class ConnectionManager(
         val res = hu.obddiag.core.mfr.MfrIdentifier(db, session).identify(onProgress)
         // az azonosításhoz megnyitott KWP-sessionök szabályos lezárása (ne maradjon vezérlő diagnosztikai módban)
         try { session.exclusive { closeSessions() } } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (_: Exception) { }
+        installManufacturer(res, session, db)
+        return res
+    }
+
+    /** Egy gyártói profilforrás eredményének bekötése: jelkészlet, lekérdező. Csak a pontosan azonosított vezérlők. */
+    suspend fun installManufacturer(res: hu.obddiag.core.mfr.MfrIdentification, session: hu.obddiag.core.mfr.MfrSession, db: hu.obddiag.core.mfr.MfrDatabase) {
         commLog.add(CommLog.Direction.INFO, "Gyártói azonosítás: ${res.identified.size} vezérlő azonosítva, ${res.detections.size} válaszolt")
         // az azonosított vezérlők adatai itt töltődnek be (fájlművelet) – ne a hívó szálán
         val reg = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { hu.obddiag.core.mfr.MfrRegistry(res, db.source) }
@@ -85,8 +91,23 @@ class ConnectionManager(
         hu.obddiag.core.mfr.MfrSignals.registry = reg
         _mfr.value = reg
         _poller.value?.mfrPoller = hu.obddiag.core.mfr.MfrPoller(reg, session, isSimulated)
-        return res
     }
+
+    /**
+     * Univerzális jármű- és ECU-felismerés a megadott gyártói forrásokkal. A gyártói jelkészlet csak akkor
+     * cserélődik, ha egy forrás pontosan azonosított vezérlőt talált.
+     */
+    suspend fun recognizeVehicle(sources: List<hu.obddiag.core.ident.ProfileSource>, userGroup: hu.obddiag.core.ident.BrandGroup?,
+                                 onStage: (String) -> Unit = {}): hu.obddiag.core.ident.VehicleRecognition? {
+        val c = _client.value ?: return null
+        commLog.add(CommLog.Direction.INFO, "Jármű- és ECU-felismerés indul")
+        val r = hu.obddiag.core.ident.VehicleRecognizer(c, sources).recognize(userGroup, onStage)
+        commLog.add(CommLog.Direction.INFO, "Felismerés kész: ${r.support.label}")
+        return r
+    }
+
+    /** A gyártói profilmotor munkamenete egy kliensre (a forrásoknak). */
+    fun newMfrSession(c: ObdClient) = hu.obddiag.core.mfr.MfrSession(c, commLog)
 
     /** Az utolsó gyártói olvasások naplója (a jelentésbe). */
     val mfrReadLog: List<String> get() = mfrSession?.readLog.orEmpty()
