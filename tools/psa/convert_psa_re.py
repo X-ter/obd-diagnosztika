@@ -156,7 +156,7 @@ def main():
         commit = "unknown"
 
     brand_cars = load_brand_cars(root, a.brand)
-    problems, skipped = [], collections.Counter()
+    problems, skipped, proto_fixes = [], collections.Counter(), []
     ecus = []
     part_index = collections.defaultdict(set)  # (req_id, ident req, part) -> modell kulcsok
 
@@ -188,7 +188,19 @@ def main():
         if ident is None or not variants:
             skipped["nincs azonosítás / cikkszám"] += 1
             continue
+        # A protokollt a tényleges azonosító kérés és az adatkönyvtárak döntik el, nem csak a címzésnél megadott
+        # címke: a forrásban van olyan vezérlő (pl. MED17_4_2), amelynél a címzés „UDS”-t ír, de valójában
+        # KWP-t beszél (21 FE azonosítás, lids/ adatok, KWP szolgáltatáslista).
         proto = addr["protocol"]
+        has_dids = bool(glob.glob(f"{d}/dids/*.yml"))
+        has_lids = bool(glob.glob(f"{d}/lids/*.yml"))
+        ident_kwp = ident["req"].startswith(("21", "1A"))
+        if proto == "UDS" and ident_kwp and has_lids and not has_dids:
+            proto_fixes.append(f"{rel}: a címzés UDS-t ír, de az azonosítás ({ident['req']}) és az adatok (lids/) KWP-sek → KWP-PSA2000")
+            proto = "KWP-PSA2000"
+        elif proto == "KWP-PSA2000" and ident["req"].startswith("22") and has_dids and not has_lids:
+            proto_fixes.append(f"{rel}: a címzés KWP-t ír, de az azonosítás ({ident['req']}) és az adatok (dids/) UDS-esek → UDS")
+            proto = "UDS"
         svc = SAFE_SERVICES[proto]
         sub = "dids" if svc == 0x22 else "lids"
         data = []
@@ -289,6 +301,9 @@ def main():
             r.write(f"# PSA-RE konverziós riport\n\n{summary}\n\n## Kihagyva\n\n")
             for k, v in skipped.most_common():
                 r.write(f"- {k}: {v}\n")
+            r.write(f"\n## Protokoll-ellentmondások a forrásban ({len(proto_fixes)}) – javítva\n\n")
+            for p_ in proto_fixes:
+                r.write(f"- {p_}\n")
             r.write(f"\n## Hibás definíciók ({len(problems)}) – nem kerültek be\n\n")
             for p in problems:
                 r.write(f"- {p}\n")

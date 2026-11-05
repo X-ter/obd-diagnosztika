@@ -309,4 +309,35 @@ class MfrTest {
         assertTrue(sent.indexOf("81") in 0 until sent.indexOf("21FE"))
         assertTrue(res.trace.any { it.contains("21FE: OK") })
     }
+
+    /** Valódi autóból (terepi azonosítási jelentés) származó válaszok: MED17.4.2 motorvezérlő, KWP-PSA2000. */
+    @Test
+    fun fieldReportMed1742IsIdentified() = runBlocking {
+        val db = realDb()
+        fun bytesOf(h: String) = h.split(" ").map { it.toInt(16) }
+        val fe = listOf(0x61, 0xFE) + bytesOf("E9 90 00 00 03 22 0C 0C 0B 02 1E 14 25 10 08 11 FD B7 33 0C 02 92 21 59")
+        val p80 = listOf(0x61, 0x80) + bytesOf("96 63 71 15 80 00 03 96 66 31 95 80 FF FF FF FF 00 01 FF FF FF FF")
+        val t = ScriptTransport(mapOf(
+            "0100" to "7E8 06 41 00 BE 3F A8 13", "ATDPN" to "A6",
+            "81" to "688 03 C1 D0 8F",
+            "21FE" to isoTp("688", fe),
+            "2180" to isoTp("688", p80),
+            "22F0FE" to "688 03 7F 22 11"
+        ))
+        t.connect()
+        val c = ObdClient(ElmSession(t)).apply { connectVehicle() }
+        val only = MfrDatabase(db.source, db.brand, db.ecus.filter { it.requestId == 0x6A8 }, emptyMap())
+        val res = MfrIdentifier(only, MfrSession(c)).identify()
+        val d = res.identified.single()
+        assertEquals("AEE2010.full/CMM/MED17_4_2", d.ecu.key)
+        assertEquals("MED1742_W2_V50", d.variant)
+        assertEquals("922159", d.partNumber)
+        assertEquals(hu.obddiag.core.mfr.MfrProtocol.KWP_PSA, d.ecu.protocol)
+        val reg = MfrRegistry(res, db.source)
+        assertTrue(reg.signals.count { it.isLive } > 150)
+        // A 21 FE azonosító blokk dekódolása (a kiolvasott cikkszám is ebben van)
+        val feItem = d.ecu.items.first { it.id == 0xFE }
+        val payload = fe.drop(2).map { it.toByte() }.toByteArray()
+        for (p in feItem.paramsFor(d.variant)!!) MfrDecoder.decode(p, payload)
+    }
 }
