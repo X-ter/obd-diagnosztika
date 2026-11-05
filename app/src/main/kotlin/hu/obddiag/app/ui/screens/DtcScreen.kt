@@ -205,17 +205,6 @@ fun DtcScreen(nav: NavController) {
             if (!connected) item {
                 ErrorBanner(stringResource(R.string.not_connected), detail = stringResource(R.string.not_connected_hint)) { nav.navigate(Routes.ADAPTER) }
             }
-            if (connected) item {
-                AppCard {
-                    Text(stringResource(R.string.dtc_other_ecus_title), style = MaterialTheme.typography.titleSmall)
-                    Spacer(Modifier.height(4.dp))
-                    Text(stringResource(R.string.dtc_other_ecus_text), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(Modifier.height(8.dp))
-                    OutlinedButton(onClick = { nav.navigate(Routes.MFR) }, modifier = Modifier.fillMaxWidth()) {
-                        Text(stringResource(R.string.dtc_other_ecus_open))
-                    }
-                }
-            }
             ui.error?.let { e -> item { ErrorBanner(if (e == "not_connected") stringResource(R.string.not_connected) else stringResource(R.string.dtc_read_error), detail = e.takeIf { it != "not_connected" }) } }
             ui.message?.let { m -> item { AppCard { Text(m, style = MaterialTheme.typography.bodyMedium) } } }
 
@@ -247,6 +236,17 @@ fun DtcScreen(nav: NavController) {
                     if (s.stored.isNotEmpty()) item {
                         SectionTitle(stringResource(R.string.freeze_frame))
                         FreezeFrameCard(ui.freezeFrame, ui.freezeLoading, ui.freezeLoaded, settings, onLoad = vm::loadFreezeFrame)
+                    }
+                }
+            }
+            if (connected) item {
+                AppCard {
+                    Text(stringResource(R.string.dtc_other_ecus_title), style = MaterialTheme.typography.titleSmall)
+                    Spacer(Modifier.height(4.dp))
+                    Text(stringResource(R.string.dtc_other_ecus_text), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedButton(onClick = { nav.navigate(Routes.MFR) }, modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.dtc_other_ecus_open))
                     }
                 }
             }
