@@ -81,7 +81,7 @@ class MfrTest {
     private fun realDb(): MfrDatabase {
         val f = listOf("app/src/main/assets/mfr/psa.dat", "../../app/src/main/assets/mfr/psa.dat",
             "/home/claude/repo/app/src/main/assets/mfr/psa.dat").map(::File).first { it.exists() }
-        return MfrDatabase.fromJson(GZIPInputStream(f.inputStream()).bufferedReader().readText())
+        return MfrDatabase.fromLines { n -> MfrDatabase.lineOf({ GZIPInputStream(f.inputStream()).reader() }, n) }
     }
 
     @Test

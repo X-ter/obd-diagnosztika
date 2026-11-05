@@ -25,7 +25,7 @@ sealed class MfrState {
 
 /**
  * A beépített Peugeot-adatbázis (PSA-RE alapján, Apache-2.0) betöltése és a vezérlők azonosítása.
- * Az adatbázis csak az első használatkor töltődik be (kb. 2,5 MB tömörítve).
+ * Az adatbázis csak az első használatkor töltődik be (kb. 3 MB tömörítve); memóriában csak a fejléc és az azonosított vezérlők adatai vannak.
  */
 class MfrRepository(private val context: Context, private val connection: ConnectionManager) {
     private val _state = MutableStateFlow<MfrState>(MfrState.Idle)
@@ -44,8 +44,10 @@ class MfrRepository(private val context: Context, private val connection: Connec
 
     suspend fun database(): MfrDatabase = loadLock.withLock {
         db ?: withContext(Dispatchers.IO) {
-            context.assets.open(ASSET).use { GZIPInputStream(it).bufferedReader(Charsets.UTF_8).readText() }
-        }.let { json -> withContext(Dispatchers.Default) { MfrDatabase.fromJson(json) } }.also { db = it }
+            MfrDatabase.fromLines { n ->
+                MfrDatabase.lineOf({ GZIPInputStream(context.assets.open(ASSET), 1 shl 16).reader(Charsets.UTF_8) }, n)
+            }
+        }.also { db = it }
     }
 
     suspend fun identify(): MfrIdentification? {

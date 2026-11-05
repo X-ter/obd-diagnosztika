@@ -72,8 +72,15 @@ class MfrEcu(
     /** szoftverváltozat → cikkszámok */
     val variants: Map<String, List<String>>,
     val ambiguousParts: Set<String>,
-    val items: List<MfrItem>
+    /** Az azonosítók csak akkor töltődnek be, ha a vezérlőt azonosítottuk (memóriatakarékosság). */
+    private val itemsLoader: () -> List<MfrItem>
 ) {
+    constructor(key: String, node: String, model: String, label: MfrText?, protocol: MfrProtocol, requestId: Int, responseId: Int,
+                ident: MfrIdentRequest, variants: Map<String, List<String>>, ambiguousParts: Set<String>, items: List<MfrItem>) :
+        this(key, node, model, label, protocol, requestId, responseId, ident, variants, ambiguousParts, { items })
+
+    val items: List<MfrItem> by lazy(itemsLoader)
+
     val readService: Int get() = if (protocol == MfrProtocol.UDS) 0x22 else 0x21
 
     fun variantForPart(part: String): String? =
@@ -93,29 +100,70 @@ class MfrDatabase(val source: MfrSource, val brand: String, val ecus: List<MfrEc
 
     companion object {
         @Suppress("UNCHECKED_CAST")
-        fun fromJson(json: String): MfrDatabase {
-            val root = MiniJson.parse(json) as Map<String, Any?>
-            require((root["format"] as? Number)?.toInt() == 1) { "Ismeretlen adatbázis-formátum" }
-            fun text(o: Any?): MfrText? = (o as? Map<String, Any?>)?.mapValues { it.value.toString() }?.let { MfrText(it) }
-            fun num(o: Any?): Double? = (o as? Number)?.toDouble()
-            fun params(o: Any?): List<MfrParam> = (o as List<Map<String, Any?>>).map { p ->
-                MfrParam(
-                    name = p["n"] as String,
-                    label = text(p["c"]),
-                    start = (p["s"] as Number).toInt(),
-                    length = (p["l"] as Number).toInt(),
-                    type = MfrType.valueOf((p["t"] as String).uppercase()),
-                    factor = num(p["f"]) ?: 1.0,
-                    offset = num(p["o"]) ?: 0.0,
-                    min = num(p["mn"]), max = num(p["mx"]),
-                    unit = p["u"] as String?,
-                    invalid = (p["inv"] as List<Any?>?)?.mapNotNull { (it as? Number)?.toLong() }.orEmpty(),
-                    littleEndian = p["le"] == true,
-                    values = (p["v"] as Map<String, Any?>?)?.entries?.mapNotNull { (k, v) -> text(v)?.let { k.toLong() to it } }?.toMap().orEmpty()
-                )
+        private fun text(o: Any?): MfrText? = (o as? Map<String, Any?>)?.mapValues { it.value.toString() }?.let { MfrText(it) }
+        private fun num(o: Any?): Double? = (o as? Number)?.toDouble()
+
+        @Suppress("UNCHECKED_CAST")
+        private fun params(o: Any?): List<MfrParam> = (o as List<Map<String, Any?>>).map { p ->
+            MfrParam(
+                name = p["n"] as String,
+                label = text(p["c"]),
+                start = (p["s"] as Number).toInt(),
+                length = (p["l"] as Number).toInt(),
+                type = MfrType.valueOf((p["t"] as String).uppercase()),
+                factor = num(p["f"]) ?: 1.0,
+                offset = num(p["o"]) ?: 0.0,
+                min = num(p["mn"]), max = num(p["mx"]),
+                unit = p["u"] as String?,
+                invalid = (p["inv"] as List<Any?>?)?.mapNotNull { (it as? Number)?.toLong() }.orEmpty(),
+                littleEndian = p["le"] == true,
+                values = (p["v"] as Map<String, Any?>?)?.entries?.mapNotNull { (k, v) -> text(v)?.let { k.toLong() to it } }?.toMap().orEmpty()
+            )
+        }
+
+        @Suppress("UNCHECKED_CAST")
+        fun parseItems(o: Any?): List<MfrItem> = (o as List<Map<String, Any?>>).map { it2 ->
+            MfrItem(
+                id = (it2["id"] as Number).toInt(),
+                name = it2["nm"] as String?,
+                label = text(it2["d"]),
+                kind = it2["k"] as String,
+                length = (it2["len"] as Number?)?.toInt(),
+                variants = (it2["var"] as List<Any?>?)?.map { v -> v.toString() }.orEmpty(),
+                params = params(it2["p"]),
+                alternatives = (it2["alt"] as List<Map<String, Any?>>?)?.map { a ->
+                    (a["var"] as List<Any?>).map { v -> v.toString() } to params(a["p"])
+                }.orEmpty()
+            )
+        }
+
+        /** 1-es formátum: egyetlen JSON, minden adattal (tesztekhez, kis adatbázisokhoz). */
+        fun fromJson(json: String): MfrDatabase = build(MiniJson.parse(json)) { e, _ -> { parseItems(e["data"]) } }
+
+        /**
+         * 2-es formátum (soronként tagolt): az első sor a fejléc (címzés, azonosítás, változatok), a további sorok
+         * vezérlőnként az azonosítók. A teljes adatbázis kicsomagolva >20 MB, ezért csak a fejlécet tartjuk memóriában,
+         * a vezérlő adatait a forrás újbóli olvasásával ([lineAt] = az n-edik sor, 0-tól), az azonosítás után töltjük be.
+         */
+        fun fromLines(lineAt: (Int) -> String): MfrDatabase =
+            build(MiniJson.parse(lineAt(0))) { e, _ ->
+                val chunk = (e["chunk"] as Number).toInt()
+                ({ parseItems(MiniJson.parse(lineAt(chunk + 1))) })
             }
+
+        /** Segédfüggvény: az n-edik sor kiolvasása egy (újra megnyitható) szövegfolyamból, majd lezárás. */
+        fun lineOf(open: () -> java.io.Reader, n: Int): String = java.io.BufferedReader(open(), 1 shl 16).use { r ->
+            repeat(n) { r.readLine() ?: error("Sérült adatbázis (hiányzó sor: $n)") }
+            r.readLine() ?: error("Sérült adatbázis (hiányzó sor: $n)")
+        }
+
+        @Suppress("UNCHECKED_CAST")
+        private fun build(rootAny: Any?, loader: (Map<String, Any?>, Int) -> () -> List<MfrItem>): MfrDatabase {
+            val root = rootAny as Map<String, Any?>
+            val fmt = (root["format"] as? Number)?.toInt()
+            require(fmt == 1 || fmt == 2) { "Ismeretlen adatbázis-formátum" }
             val src = root["source"] as Map<String, Any?>
-            val ecus = (root["ecus"] as List<Map<String, Any?>>).map { e ->
+            val ecus = (root["ecus"] as List<Map<String, Any?>>).mapIndexed { idx, e ->
                 val id = e["ident"] as Map<String, Any?>
                 MfrEcu(
                     key = e["key"] as String,
@@ -128,20 +176,7 @@ class MfrDatabase(val source: MfrSource, val brand: String, val ecus: List<MfrEc
                     ident = MfrIdentRequest(id["req"] as String, (id["byte"] as Number).toInt(), (id["len"] as Number).toInt()),
                     variants = (e["variants"] as Map<String, Any?>).mapValues { (_, v) -> (v as List<Any?>).map { it.toString() } },
                     ambiguousParts = (e["ambiguousParts"] as List<Any?>?)?.map { it.toString() }?.toSet().orEmpty(),
-                    items = (e["data"] as List<Map<String, Any?>>).map { it2 ->
-                        MfrItem(
-                            id = (it2["id"] as Number).toInt(),
-                            name = it2["nm"] as String?,
-                            label = text(it2["d"]),
-                            kind = it2["k"] as String,
-                            length = (it2["len"] as Number?)?.toInt(),
-                            variants = (it2["var"] as List<Any?>?)?.map { v -> v.toString() }.orEmpty(),
-                            params = params(it2["p"]),
-                            alternatives = (it2["alt"] as List<Map<String, Any?>>?)?.map { a ->
-                                (a["var"] as List<Any?>).map { v -> v.toString() } to params(a["p"])
-                            }.orEmpty()
-                        )
-                    }
+                    itemsLoader = loader(e, idx)
                 )
             }
             return MfrDatabase(

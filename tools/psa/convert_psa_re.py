@@ -278,16 +278,21 @@ def main():
                 nodes[name] = text(n.get("description"))
 
     out = {
-        "format": 1,
+        "format": 2,
         "source": {"name": "PSA-RE", "url": "https://github.com/prototux/PSA-RE", "commit": commit, "license": "Apache-2.0"},
         "brand": a.brand,
         "nodes": nodes,
         "ecus": ecus,
     }
-    raw = json.dumps(out, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    # 2-es formátum: 1. sor = fejléc (adatok nélkül), utána vezérlőnként egy sor az azonosítókkal.
+    # Így a telefon csak a fejlécet tartja memóriában, a vezérlő adatait azonosítás után tölti be.
+    dumps = lambda o: json.dumps(o, ensure_ascii=False, separators=(",", ":"))
+    header = dict(out, ecus=[dict({k: v for k, v in e.items() if k != "data"}, chunk=i) for i, e in enumerate(ecus)])
+    raw = (dumps(header) + "\n" + "".join(dumps(e["data"]) + "\n" for e in ecus)).encode("utf-8")
     os.makedirs(os.path.dirname(os.path.abspath(a.out)), exist_ok=True)
     with gzip.open(a.out, "wb", compresslevel=9) as fh:
         fh.write(raw)
+    print(f"fejléc: {len(dumps(header))/1e6:.2f} MB")
 
     n_items = sum(len(e["data"]) for e in ecus)
     n_params = sum(len(i["p"]) for e in ecus for i in e["data"])

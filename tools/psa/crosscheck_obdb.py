@@ -3,7 +3,11 @@
 Csak ellenőrzésre szolgál: OBDb-adat NEM kerül az appba.
 Futtatás: python3 tools/psa/crosscheck_obdb.py <psa.dat> <OBDb klónok könyvtára> <riport.md>"""
 import gzip, json, glob, sys, collections
-db = json.load(gzip.open(sys.argv[1]))
+_lines = gzip.open(sys.argv[1], "rt", encoding="utf-8").read().splitlines()
+db = json.loads(_lines[0])
+if db.get("format") == 2:  # soronként tagolt: a vezérlők adatai külön sorokban
+    for e in db["ecus"]:
+        e["data"] = json.loads(_lines[e["chunk"] + 1])
 by = collections.defaultdict(list)  # (rq, svc, id) -> [(modell, param)]
 for e in db["ecus"]:
     svc = 0x22 if e["proto"] == "UDS" else 0x21

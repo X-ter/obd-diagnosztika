@@ -1,6 +1,6 @@
 # PSA-RE konverziós riport
 
-PSA-RE 67f7581e | márka: all | ECU-modellek: 423 | azonosítók: 14659 (élő: 9296) | paraméterek: 47877 | nem egyértelmű cikkszám: 215 | méret: 21.8 MB → 2.98 MB (gzip)
+PSA-RE 67f7581e | márka: all | ECU-modellek: 423 | azonosítók: 14659 (élő: 9296) | paraméterek: 47877 | nem egyértelmű cikkszám: 215 | méret: 21.8 MB → 2.90 MB (gzip)
 
 ## Kihagyva
 

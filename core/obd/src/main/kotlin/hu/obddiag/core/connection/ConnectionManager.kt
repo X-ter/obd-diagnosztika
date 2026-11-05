@@ -77,7 +77,8 @@ class ConnectionManager(
         commLog.add(CommLog.Direction.INFO, "Gyártói azonosítás indul (${db.source.name} ${db.source.commit.take(8)})")
         val res = hu.obddiag.core.mfr.MfrIdentifier(db, session).identify(onProgress)
         commLog.add(CommLog.Direction.INFO, "Gyártói azonosítás: ${res.identified.size} vezérlő azonosítva, ${res.detections.size} válaszolt")
-        val reg = hu.obddiag.core.mfr.MfrRegistry(res, db.source)
+        // az azonosított vezérlők adatai itt töltődnek be (fájlművelet) – ne a hívó szálán
+        val reg = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { hu.obddiag.core.mfr.MfrRegistry(res, db.source) }
         mfrSession = session
         hu.obddiag.core.mfr.MfrSignals.registry = reg
         _mfr.value = reg
